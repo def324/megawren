@@ -1,5 +1,7 @@
 # Third-party notices
 
+The official MEGA SDK is distributed under the [BSD 2-Clause License](https://github.com/meganz/sdk/blob/2c95a487b4b297dba1d792c88189d432c3452694/LICENSE). The SDK and other dependencies retain their own licenses.
+
 ## nvim-web-devicons
 
 The small Nerd Font file-type icon mapping in `src/tui/icons.rs` is adapted from
