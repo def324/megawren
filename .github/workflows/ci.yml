@@ -1,0 +1,44 @@
+name: checks
+on: [push, pull_request]
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev patchelf
+      - if: runner.os == 'macOS'
+        run: |
+          echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
+          brew install cmake pkgconf cryptopp libsodium icu4c
+      - run: ./scripts/build-sdk.sh
+      - run: cargo fmt --check
+      - run: ./scripts/cargo.sh test --locked
+      - run: ./scripts/cargo.sh clippy --all-targets --locked -- -D warnings
+      - run: ./scripts/cargo.sh build --release --locked
+      - run: python3 scripts/package.py
+      - name: Run unpacked client
+        run: |
+          mkdir -p "$RUNNER_TEMP/megawren-package"
+          tar -xzf target/dist/*.tar.gz -C "$RUNNER_TEMP/megawren-package"
+          cd "$RUNNER_TEMP/megawren-package"/megawren-*
+          bin/megawren --help
+          bin/megawren status
+      - uses: actions/upload-artifact@v4
+        with:
+          name: megawren-${{ matrix.runner }}
+          path: target/dist/

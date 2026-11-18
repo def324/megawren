@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(megawren_baseline LANGUAGES CXX)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDK REQUIRED IMPORTED_TARGET sdklib)
+add_executable(megawren-baseline baseline.cpp)
+target_compile_features(megawren-baseline PRIVATE cxx_std_20)
+target_link_libraries(megawren-baseline PRIVATE PkgConfig::SDK)

@@ -1,0 +1,3 @@
+[submodule "vendor/mega"]
+	path = vendor/mega
+	url = https://github.com/meganz/sdk.git
