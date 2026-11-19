@@ -1,5 +1,18 @@
 name: checks
-on: [push, pull_request]
+# Prose-only changes skip the build. Tag pushes always run, since GitHub
+# does not apply path filters to tags. Packaging reads THIRD_PARTY_NOTICES.md
+# and docs/licenses/, so those still trigger it.
+on:
+  push:
+    paths-ignore:
+      - README.md
+      - docs/*.md
+      - docs/media/**
+  pull_request:
+    paths-ignore:
+      - README.md
+      - docs/*.md
+      - docs/media/**
 concurrency:
   group: checks-${{ github.ref }}
   cancel-in-progress: true
