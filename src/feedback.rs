@@ -5,15 +5,36 @@ use anyhow::Result;
 use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicBool};
 use zeroize::Zeroizing;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Confirmation {
+    Remember,
+    WithoutPassphrase,
+    Replace,
+    Expired,
+}
+impl Confirmation {
+    pub fn question(self) -> &'static str {
+        match self {
+            Self::Remember => "Remember login on this device?",
+            Self::WithoutPassphrase => {
+                "Anyone who can read your saved login can access your MEGA account."
+            }
+            Self::Replace => "Replace saved login? The old server session stays active.",
+            Self::Expired => "Saved login expired. Sign in again?",
+        }
+    }
+}
+
 pub trait Surface {
     fn read(
         &self,
         label: &str,
         hidden: bool,
         max: usize,
+        error: Option<&'static str>,
         cancel: &AtomicBool,
     ) -> Result<Zeroizing<String>>;
-    fn confirm(&self, question: &str, cancel: &AtomicBool) -> Result<bool>;
+    fn confirm(&self, choice: Confirmation, cancel: &AtomicBool) -> Result<bool>;
     fn progress(&self, stage: Stage, bytes: i64, total: i64, retry: i32, cancelling: bool);
     fn note(&self, message: &str);
     fn browse(
@@ -59,12 +80,13 @@ pub fn read(
     label: &str,
     hidden: bool,
     max: usize,
+    error: Option<&'static str>,
     cancel: &AtomicBool,
 ) -> Option<Result<Zeroizing<String>>> {
-    current().map(|s| s.read(label, hidden, max, cancel))
+    current().map(|s| s.read(label, hidden, max, error, cancel))
 }
-pub fn confirm(question: &str, cancel: &AtomicBool) -> Option<Result<bool>> {
-    current().map(|s| s.confirm(question, cancel))
+pub fn confirm(choice: Confirmation, cancel: &AtomicBool) -> Option<Result<bool>> {
+    current().map(|s| s.confirm(choice, cancel))
 }
 pub fn progress(stage: Stage, bytes: i64, total: i64, retry: i32, cancelling: bool) -> bool {
     if let Some(s) = current() {

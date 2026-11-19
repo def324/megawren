@@ -30,7 +30,7 @@ Before moving a folder to the Rubbish Bin, the worker checks its descendants for
 
 ## Saved state
 
-The local passphrase unlocks the saved MEGA session. The session supplies the key for the encrypted file index. The SDK opens its databases in a private per-run directory. On exit, Megawren closes the SDK before saving a replacement index. A read-only visit can reuse the existing snapshot. [Session vault](../src/vault.rs) · [Index format](../src/cache.rs) · [Save decision](../src/backend.rs)
+A passphrase-protected login uses the original session vault format. A login saved without a passphrase uses a distinct authenticated header and opens automatically with an empty passphrase. Its protection depends on the private file permissions. The session supplies the key for the encrypted file index. The SDK opens its databases in a private per-run directory. On exit, Megawren closes the SDK before saving a replacement index. A read-only visit can reuse the existing snapshot. [Session vault](../src/vault.rs) · [Index format](../src/cache.rs) · [Save decision](../src/backend.rs)
 
 ## Screenshots and packages
 

@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     bridge::ffi,
-    feedback::{self, Surface},
+    feedback::{self, Confirmation, Surface},
     operation::Stage,
 };
 use anyhow::{Context, ensure};
@@ -44,7 +44,7 @@ fn change(app: &App, action: impl FnOnce(&mut AppState)) {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum InputMode {
     Text,
-    Choice,
+    Choice(Confirmation),
     Error,
 }
 struct Request {
@@ -52,6 +52,7 @@ struct Request {
     hidden: bool,
     max: usize,
     mode: InputMode,
+    error: Option<&'static str>,
     reply: SyncSender<Result<Zeroizing<String>>>,
 }
 pub(super) struct Prompt {
@@ -69,6 +70,7 @@ pub(super) fn preview_prompt(label: &str, hidden: bool, value: &str, mode: Input
             hidden,
             max: 4096,
             mode,
+            error: None,
             reply,
         },
         value: Zeroizing::new(value.into()),
@@ -128,7 +130,7 @@ impl Prompt {
         if key.code == KeyCode::Esc {
             return Action::Exit;
         }
-        if self.mode() == InputMode::Choice {
+        if matches!(self.mode(), InputMode::Choice(_)) {
             match key.code {
                 KeyCode::Left => self.choice = false,
                 KeyCode::Right => self.choice = true,
@@ -143,9 +145,11 @@ impl Prompt {
                 KeyCode::Enter => return Action::Submit,
                 KeyCode::Backspace => {
                     self.value.pop();
+                    self.error = None;
                 }
                 KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    self.value.clear()
+                    self.value.clear();
+                    self.error = None;
                 }
                 KeyCode::Char(c)
                     if !c.is_control()
@@ -161,7 +165,7 @@ impl Prompt {
         Action::None
     }
     fn submit(self) {
-        let answer = if self.mode() == InputMode::Choice {
+        let answer = if matches!(self.mode(), InputMode::Choice(_)) {
             Zeroizing::new(if self.choice { "y" } else { "n" }.into())
         } else {
             self.value
@@ -185,6 +189,7 @@ impl Frontend {
         hidden: bool,
         max: usize,
         mode: InputMode,
+        error: Option<&'static str>,
         cancel: &AtomicBool,
     ) -> Result<Zeroizing<String>> {
         if mode != InputMode::Error {
@@ -197,6 +202,7 @@ impl Frontend {
                 hidden,
                 max,
                 mode,
+                error,
                 reply: send,
             })
             .context("Terminal interface closed")?;
@@ -224,13 +230,21 @@ impl Surface for Frontend {
         label: &str,
         hidden: bool,
         max: usize,
+        error: Option<&'static str>,
         cancel: &AtomicBool,
     ) -> Result<Zeroizing<String>> {
-        self.ask(label, hidden, max, InputMode::Text, cancel)
+        self.ask(label, hidden, max, InputMode::Text, error, cancel)
     }
-    fn confirm(&self, question: &str, cancel: &AtomicBool) -> Result<bool> {
+    fn confirm(&self, choice: Confirmation, cancel: &AtomicBool) -> Result<bool> {
         Ok(self
-            .ask(question, false, 1, InputMode::Choice, cancel)?
+            .ask(
+                choice.question(),
+                false,
+                1,
+                InputMode::Choice(choice),
+                None,
+                cancel,
+            )?
             .as_str()
             == "y")
     }
@@ -407,6 +421,7 @@ fn application_inner(
                 false,
                 0,
                 InputMode::Error,
+                None,
                 &cancel,
             );
         }
@@ -468,10 +483,10 @@ fn terminal_app(
             let mode = request.mode;
             if !cancel.load(Ordering::Relaxed) || mode == InputMode::Error {
                 prompt = Some(Prompt {
+                    error: request.error,
                     request,
                     value: Zeroizing::new(String::new()),
                     choice: false,
-                    error: None,
                 });
                 change(&app, |s| s.phase = Phase::Input);
             }

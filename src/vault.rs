@@ -4,6 +4,12 @@ use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::AeadInPlace};
 use zeroize::Zeroizing;
 const MAGIC: &[u8; 8] = b"MGWSESS\0";
 const HEADER: usize = 68;
+const LOCKED: [u8; 4] = [1, 0, 1, 1];
+// The mode is authenticated along with the rest of the vault header.
+const AUTOMATIC: [u8; 4] = [2, 0, 1, 1];
+pub fn opens_automatically(data: &[u8]) -> bool {
+    data.starts_with(MAGIC) && data.get(8..12) == Some(&AUTOMATIC)
+}
 fn aad(header: &[u8]) -> Vec<u8> {
     let mut data = b"megawren/session/v1".to_vec();
     data.extend_from_slice(header);
@@ -25,19 +31,18 @@ fn derive(password: &[u8], header: &[u8]) -> Result<Zeroizing<[u8; 32]>> {
     Ok(key)
 }
 pub fn seal(password: &[u8], session: &[u8]) -> Result<Vec<u8>> {
-    ensure!(
-        !password.is_empty() && password.len() <= 4096,
-        "Invalid unlock passphrase length"
-    );
+    ensure!(password.len() <= 4096, "Unlock passphrase is too long");
     ensure!(
         !session.is_empty() && session.len() <= 60000,
         "Invalid session size"
     );
     let mut h = vec![0u8; HEADER];
     h[..8].copy_from_slice(MAGIC);
-    h[8..10].copy_from_slice(&1u16.to_le_bytes());
-    h[10] = 1;
-    h[11] = 1;
+    h[8..12].copy_from_slice(if password.is_empty() {
+        &AUTOMATIC
+    } else {
+        &LOCKED
+    });
     for (i, v) in [(12, 65536u32), (16, 3), (20, 1)] {
         h[i..i + 4].copy_from_slice(&v.to_le_bytes());
     }
@@ -59,8 +64,12 @@ pub fn open(password: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
         "Invalid session vault"
     );
     ensure!(
-        &data[..8] == MAGIC && data[8..12] == [1, 0, 1, 1],
+        data.starts_with(MAGIC) && (data[8..12] == LOCKED || opens_automatically(data)),
         "Unsupported session vault"
+    );
+    ensure!(
+        password.is_empty() == opens_automatically(data),
+        "Incorrect passphrase for saved login"
     );
     let len = u32::from_le_bytes(data[64..68].try_into().unwrap()) as usize;
     ensure!(len == data.len() - HEADER, "Invalid session vault length");
@@ -84,6 +93,27 @@ pub fn open(password: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_short_passphrase_still_locks_the_session() {
+        let data = seal(b"x", b"session bytes").unwrap();
+        assert_eq!(&data[8..12], &[1, 0, 1, 1]);
+        assert!(open(b"", &data).is_err());
+        assert_eq!(&*open(b"x", &data).unwrap(), b"session bytes");
+    }
+    #[test]
+    fn a_passwordless_session_has_a_distinct_authenticated_header() {
+        let mut data = seal(b"", b"session bytes").unwrap();
+        assert_ne!(&data[8..12], &[1, 0, 1, 1]);
+        assert_eq!(&*open(b"", &data).unwrap(), b"session bytes");
+        data[8..12].copy_from_slice(&[1, 0, 1, 1]);
+        assert!(open(b"", &data).is_err());
+
+        let mut protected = seal(b"x", b"session bytes").unwrap();
+        let automatic = seal(b"", b"other").unwrap();
+        protected[8..12].copy_from_slice(&automatic[8..12]);
+        assert!(open(b"", &protected).is_err());
+        assert!(open(b"x", &protected).is_err());
+    }
     #[test]
     fn roundtrip_and_tampering() {
         let data = seal(b"test passphrase", b"session bytes").unwrap();

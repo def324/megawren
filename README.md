@@ -4,7 +4,7 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 
 ## Features
 
-- Sign in with two-factor authentication. Optionally save an encrypted login and file index.
+- Sign in with two-factor authentication. Save your login with an optional local passphrase.
 - Upload and download files or folders while browsing. Track and cancel transfers in the TUI.
 - Rename, move, or copy selected items. Restore files and folders from the Rubbish Bin.
 - Preview text files and images on request.
@@ -24,7 +24,9 @@ Prebuilt archives for Apple Silicon, Intel Macs and x86-64 Linux are available o
 
 Run `megawren` to open the browser, or `./bin/megawren` from an unpacked archive.
 
-Sign in with your MEGA email, password, and authenticator code if you use one. Choose **Yes, save login** to stay signed in on this computer. Next time, you’ll just need the local passphrase you set here. The first visit can take a while on a large drive. Remembering your login also saves the file list so it opens faster next time.
+Sign in with your MEGA email, password, and authenticator code if you use one. Choose **Yes, save login** to stay signed in on this computer. Set a local passphrase, or leave it blank and confirm **Save anyway** to open the drive automatically. Without a passphrase, anyone who can read your saved login can access your MEGA account.
+
+The first visit can take a while on a large drive. Remembering your login also saves the file list so it opens faster next time.
 
 ## Find and transfer files
 
@@ -55,7 +57,7 @@ With one path, `get` downloads here and `put` uploads to `/`. With two or more p
 
 Downloads keep existing files unless you pass `--overwrite`. Uploads stop on a conflicting filename. If a batch fails, completed files stay in place and the command exits with an error. For a public MEGA link, run `megawren get`, paste the link at the hidden prompt, then choose a download directory. Press Enter to use the current directory.
 
-**From a script**, run `megawren login` once in a terminal. Have your secret manager write the local unlock passphrase to stdin, one line per invocation. This example receives it on file descriptor 3.
+**From a script**, run `megawren login` once in a terminal. If you saved a passphrase, have your secret manager supply it on stdin using `--unlock-stdin`. This example receives it on file descriptor 3. With a passphrase-free login, just run `megawren ls --json /Reports`.
 
 ```sh
 megawren --unlock-stdin ls --json /Reports <&3 >reports.json
@@ -69,7 +71,7 @@ Run `megawren status` to see the paths on your machine. The files below live in 
 
 | Path | Contents |
 | --- | --- |
-| `session.enc` | Your encrypted session, if you chose to remember it. |
+| `session.enc` | Your saved MEGA session. A local passphrase protects it if you set one. |
 | `cache.enc` | Your file index, compressed and encrypted. Browsing, previews, and downloads reuse it for up to a day. Cloud edits, uploads, or a full reload can update it sooner. |
 | `state.lock` and `run-*/` | The account lock and temporary SDK databases and transfer data. A normal exit removes the working directory. |
 

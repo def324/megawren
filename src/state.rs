@@ -148,7 +148,7 @@ impl State {
         use std::io::Read;
         let path = self.path.join("session.enc");
         validate(&path, false)?;
-        let f = private_options().open(&path)?;
+        let f = private_options().write(false).open(&path)?;
         ensure!(f.metadata()?.len() <= 65536, "Session vault is too large");
         let mut data = Vec::new();
         f.take(65537).read_to_end(&mut data)?;

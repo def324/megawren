@@ -166,6 +166,44 @@ impl Drop for Pty {
 const FIXTURE: &str = "  synthetic pässphrase  ";
 const SYNTHETIC_SESSION: &[u8] = b"offline lifecycle test session, no real account";
 
+#[test]
+fn empty_passphrase_needs_explicit_consent_and_then_opens_automatically() {
+    let fixture = tempfile::tempdir().unwrap();
+    let mut p = Pty::new("choose-passphrase", fixture.path());
+    p.until("(optional)");
+    p.type_bytes(b"\r");
+    p.until("anyway");
+    assert!(!fixture.path().join("state/session.enc").exists());
+    p.type_bytes(b"\r"); // The default returns to the field.
+    p.output.clear();
+    p.until("(optional)");
+    p.type_bytes(b"\ry\r");
+    p.finish(0);
+    let stored = std::fs::read(fixture.path().join("state/session.enc")).unwrap();
+    assert!(crate::vault::opens_automatically(&stored));
+    assert_eq!(
+        &*crate::vault::open(b"", &stored).unwrap(),
+        SYNTHETIC_SESSION
+    );
+}
+
+#[test]
+fn confirmation_mismatch_can_be_corrected_with_a_one_character_passphrase() {
+    let fixture = tempfile::tempdir().unwrap();
+    let mut p = Pty::new("choose-passphrase", fixture.path());
+    p.until("(optional)");
+    p.type_bytes(b"x\ry\r");
+    p.until("didn");
+    p.type_bytes(b"x\rx\r");
+    p.finish(0);
+    let stored = std::fs::read(fixture.path().join("state/session.enc")).unwrap();
+    assert!(!crate::vault::opens_automatically(&stored));
+    assert_eq!(
+        &*crate::vault::open(b"x", &stored).unwrap(),
+        SYNTHETIC_SESSION
+    );
+}
+
 fn count(output: &str, needle: &str) -> usize {
     output.matches(needle).count()
 }
@@ -339,6 +377,7 @@ fn prompt_masks_secrets_bounds_paste_and_exposes_recovery_as_an_action() {
             hidden: true,
             max: 32,
             mode: InputMode::Text,
+            error: None,
             reply,
         },
         value: Zeroizing::new(String::new()),
@@ -370,6 +409,11 @@ fn application_child() {
     let before = terminal_flags(0);
     let result = application_inner(cancel.clone(), |frontend| {
         let state = crate::state::State::at(fixture.join("state"))?;
+        if mode == "choose-passphrase" {
+            let pass = crate::choose_passphrase(&cancel)?;
+            state.save(&crate::vault::seal(pass.as_bytes(), SYNTHETIC_SESSION)?)?;
+            return Ok(());
+        }
         if mode == "sequence" {
             let email = crate::line("Email: ", &cancel)?;
             assert_eq!(email, "test@example.invalid");

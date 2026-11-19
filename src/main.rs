@@ -15,6 +15,7 @@ mod tui;
 mod vault;
 use anyhow::{Context, Result, ensure};
 use clap::{Parser, Subcommand};
+use feedback::Confirmation;
 use operation::Stage;
 use std::{
     io::{self, IsTerminal},
@@ -45,7 +46,7 @@ struct Args {
 enum Command {
     /// Preview a small remote text file or image on request
     Preview { remote: String },
-    /// Save or replace an encrypted login
+    /// Save or replace a login, with an optional local passphrase
     Login,
     /// List a remote directory
     Ls {
@@ -82,24 +83,42 @@ enum Command {
     Status,
 }
 pub fn line(label: &str, cancel: &AtomicBool) -> Result<String> {
-    if let Some(value) = feedback::read(label, false, 32768, cancel) {
+    if let Some(value) = feedback::read(label, false, 32768, None, cancel) {
         return Ok(value?.to_string());
     }
     Ok(input::read(label, false, 32768, cancel)?.to_string())
 }
 pub fn prompt(label: &str, cancel: &AtomicBool) -> Result<Zeroizing<String>> {
-    if let Some(value) = feedback::read(label, true, 4096, cancel) {
+    prompt_with_error(label, None, cancel)
+}
+fn prompt_with_error(
+    label: &str,
+    error: Option<&'static str>,
+    cancel: &AtomicBool,
+) -> Result<Zeroizing<String>> {
+    if let Some(value) = feedback::read(label, true, 4096, error, cancel) {
         return value;
+    }
+    if let Some(message) = error {
+        eprintln!("{message}");
     }
     input::read(label, true, 4096, cancel)
 }
-fn unlock(stdin: bool, cancel: &AtomicBool) -> Result<Zeroizing<String>> {
+fn unlock(
+    stdin: bool,
+    automatic: bool,
+    error: Option<&'static str>,
+    cancel: &AtomicBool,
+) -> Result<Zeroizing<String>> {
+    if automatic {
+        return Ok(Zeroizing::new(String::new()));
+    }
     if !stdin {
         ensure!(
             input::can_prompt() || feedback::active(),
             "Saved login is locked. Use --unlock-stdin and supply the local passphrase on stdin."
         );
-        return prompt("Unlock saved login: ", cancel);
+        return prompt_with_error("Unlock saved login: ", error, cancel);
     }
     ensure!(
         !io::stdin().is_terminal(),
@@ -107,12 +126,18 @@ fn unlock(stdin: bool, cancel: &AtomicBool) -> Result<Zeroizing<String>> {
     );
     input::read_stdin_line(4097, cancel)
 }
-fn remember_login(cancel: &AtomicBool) -> Result<bool> {
-    if let Some(answer) = feedback::confirm("Remember login on this device?", cancel) {
+fn confirm_save(choice: Confirmation, cancel: &AtomicBool) -> Result<bool> {
+    if let Some(answer) = feedback::confirm(choice, cancel) {
         return answer;
     }
+    let question = if choice == Confirmation::WithoutPassphrase {
+        eprintln!("{}", choice.question());
+        "Save without a passphrase?"
+    } else {
+        choice.question()
+    };
     loop {
-        let answer = line("Remember login on this device? [y/N]: ", cancel)?;
+        let answer = line(&format!("{question} [y/N]: "), cancel)?;
         match answer.trim().to_ascii_lowercase().as_str() {
             "y" | "yes" => return Ok(true),
             "" | "n" | "no" => return Ok(false),
@@ -125,37 +150,36 @@ fn account_login(backend: &mut backend::Backend, cancel: &AtomicBool) -> Result<
     let password = prompt("Password: ", cancel)?;
     backend.login(&email, &password)
 }
+fn choose_passphrase(cancel: &AtomicBool) -> Result<Zeroizing<String>> {
+    let mut error = None;
+    loop {
+        let pass = prompt_with_error("Local passphrase (optional): ", error.take(), cancel)?;
+        if pass.is_empty() {
+            if confirm_save(Confirmation::WithoutPassphrase, cancel)? {
+                return Ok(pass);
+            }
+            continue;
+        }
+        if *pass == *prompt("Confirm local passphrase: ", cancel)? {
+            return Ok(pass);
+        }
+        error = Some("Passphrases didn’t match. Try again.");
+    }
+}
 fn save_login(
     state: &state::State,
     backend: &mut backend::Backend,
     cancel: &AtomicBool,
 ) -> Result<()> {
-    loop {
-        let pass = prompt("New local unlock passphrase: ", cancel)?;
-        let long_enough = pass.chars().count() >= 12;
-        if !long_enough && feedback::active() {
-            feedback::note("Use at least 12 characters for the local passphrase.");
-            continue;
-        }
-        ensure!(
-            long_enough,
-            "Use at least 12 characters for the unlock passphrase"
-        );
-        let confirm = prompt("Confirm unlock passphrase: ", cancel)?;
-        if *pass != *confirm && feedback::active() {
-            feedback::note("Passphrases do not match. Try again.");
-            continue;
-        }
-        ensure!(*pass == *confirm, "Passphrases do not match");
-        let session = backend.session()?;
-        feedback::progress(Stage::SavingLogin, 0, 0, 0, false);
-        let sealed = vault::seal(pass.as_bytes(), session.as_bytes())?;
-        input::check(cancel)?;
-        state.save(&sealed)?;
-        backend.remember_session(session.as_bytes())?;
-        cache::remove(&state.path)?;
-        return Ok(());
-    }
+    let pass = choose_passphrase(cancel)?;
+    let session = backend.session()?;
+    feedback::progress(Stage::SavingLogin, 0, 0, 0, false);
+    let sealed = vault::seal(pass.as_bytes(), session.as_bytes())?;
+    input::check(cancel)?;
+    state.save(&sealed)?;
+    backend.remember_session(session.as_bytes())?;
+    cache::remove(&state.path)?;
+    Ok(())
 }
 fn run(args: Args) -> Result<()> {
     let path = state::home()?;
@@ -164,7 +188,11 @@ fn run(args: Args) -> Result<()> {
             "Saved login: {} ({})",
             state::display(&path.join("session.enc").display().to_string()),
             if path.join("session.enc").try_exists()? {
-                "locked"
+                if vault::opens_automatically(&state::State::at(path.clone())?.read_vault()?) {
+                    "no passphrase"
+                } else {
+                    "locked"
+                }
             } else {
                 "none"
             }
@@ -262,15 +290,15 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
         } else if state.path.join("session.enc").try_exists()?
             && !matches!(args.command, Some(Command::Login))
         {
+            let data = state.read_vault()?;
+            let automatic = vault::opens_automatically(&data);
+            let mut error = None;
             let session = loop {
-                let pass = match unlock(args.unlock_stdin, &cancelled) {
+                let pass = match unlock(args.unlock_stdin, automatic, error, &cancelled) {
                     Ok(pass) => pass,
                     Err(e) if e.is::<feedback::SignInAgain>() => {
-                        if !feedback::confirm(
-                            "Replace saved login? The old server session stays active.",
-                            &cancelled,
-                        )
-                        .context("Interactive recovery is unavailable")??
+                        if !feedback::confirm(Confirmation::Replace, &cancelled)
+                            .context("Interactive recovery is unavailable")??
                         {
                             continue;
                         }
@@ -284,11 +312,16 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                 };
                 startup_feedback = Some(operation::StartupFeedback::begin());
                 feedback::progress(Stage::UnlockingLogin, 0, 0, 0, false);
-                match vault::open(pass.as_bytes(), &state.read_vault()?) {
+                match vault::open(pass.as_bytes(), &data) {
                     Ok(session) => break Some(session),
-                    Err(_) if feedback::active() && !args.unlock_stdin => feedback::note(
-                        "Passphrase not accepted. Try again, or press F2 to sign in again.",
-                    ),
+                    Err(e) if automatic => {
+                        return Err(e.context(
+                            "Cannot read saved login. Run megawren login to sign in again.",
+                        ));
+                    }
+                    Err(_) if feedback::active() && !args.unlock_stdin => {
+                        error = Some("Passphrase not accepted. Try again.");
+                    }
                     Err(e) => return Err(e.context(error::UnlockSavedLogin)),
                 }
             };
@@ -309,7 +342,7 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                         return Ok(());
                     }
                     if !feedback::active()
-                        || !feedback::confirm("Saved login expired. Sign in again?", &cancelled)
+                        || !feedback::confirm(Confirmation::Expired, &cancelled)
                             .context("Interactive sign-in unavailable")??
                     {
                         return Err(e);
@@ -338,7 +371,7 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                 match step {
                     startup::Step::SaveLogin => save_login(&state, &mut backend, &cancelled)?,
                     startup::Step::OfferRemember => {
-                        if remember_login(&cancelled)? {
+                        if confirm_save(Confirmation::Remember, &cancelled)? {
                             save_login(&state, &mut backend, &cancelled)?;
                         }
                     }

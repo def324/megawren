@@ -1581,6 +1581,7 @@ pub(super) fn draw_lifecycle(
     elapsed: std::time::Duration,
 ) {
     use super::lifecycle::{InputMode, Phase};
+    use crate::feedback::Confirmation;
     let prompt = if app.phase == Phase::Input {
         prompt
     } else {
@@ -1607,17 +1608,17 @@ pub(super) fn draw_lifecycle(
     let title = if let Some(p) = prompt {
         if p.mode() == InputMode::Error {
             "Could not continue"
-        } else if p.mode() == InputMode::Choice {
-            if p.label().starts_with("Remember") {
-                "Remember login"
-            } else {
-                "Sign in again"
+        } else if let InputMode::Choice(choice) = p.mode() {
+            match choice {
+                Confirmation::Remember => "Remember login",
+                Confirmation::WithoutPassphrase => "Save without a passphrase?",
+                Confirmation::Replace | Confirmation::Expired => "Sign in again",
             }
         } else if p.label().starts_with("Unlock") {
             "Unlock saved login"
         } else if p.label().starts_with("Authenticator") {
             "Two-factor authentication"
-        } else if p.label().contains("unlock passphrase") {
+        } else if p.label().contains("passphrase") {
             "Remember login"
         } else {
             "Sign in to MEGA"
@@ -1653,41 +1654,37 @@ pub(super) fn draw_lifecycle(
                 );
                 hint = "Enter or Esc close";
             }
-            InputMode::Choice => {
-                let remember = p.label().starts_with("Remember");
-                frame.render_widget(
-                    Paragraph::new(p.label()).wrap(Wrap { trim: true }),
-                    Rect::new(inner.x, inner.y, inner.width, 2),
-                );
+            InputMode::Choice(choice) => {
+                let (no, yes) = match choice {
+                    Confirmation::Remember => (" No, this time only ", " Yes, save login "),
+                    Confirmation::WithoutPassphrase => (" Go back ", " Save anyway "),
+                    Confirmation::Replace | Confirmation::Expired => {
+                        (" No ", " Yes, sign in again ")
+                    }
+                };
+                let question = Paragraph::new(p.label()).wrap(Wrap { trim: true });
+                let lines = question.line_count(inner.width) as u16;
+                frame.render_widget(question, Rect::new(inner.x, inner.y, inner.width, lines));
                 frame.render_widget(
                     Paragraph::new(Line::from(vec![
-                        Span::styled(
-                            if remember {
-                                "  No, this time only  "
-                            } else {
-                                "  No  "
-                            },
-                            if p.choice { accent() } else { selected() },
-                        ),
+                        Span::styled(no, if p.choice { accent() } else { selected() }),
                         Span::raw("   "),
-                        Span::styled(
-                            if remember {
-                                "  Yes, save login  "
-                            } else {
-                                "  Yes, sign in again  "
-                            },
-                            if p.choice { selected() } else { accent() },
-                        ),
+                        Span::styled(yes, if p.choice { selected() } else { accent() }),
                     ])),
-                    Rect::new(inner.x, inner.y + 3, inner.width, 1),
+                    Rect::new(
+                        inner.x,
+                        (inner.y + lines + 1).min(inner.bottom() - 2),
+                        inner.width,
+                        1,
+                    ),
                 );
                 hint = "← → choose · Enter confirm · Esc quit";
             }
             InputMode::Text => {
                 let explanation = if p.label().starts_with("Unlock") {
                     "Enter the local passphrase for this device."
-                } else if p.label().starts_with("New local") {
-                    "Choose a local unlock passphrase of at least 12 characters."
+                } else if p.label().starts_with("Local passphrase") {
+                    "Leave blank to open your drive without a passphrase."
                 } else if p.label().starts_with("Confirm") {
                     "Enter the same local passphrase again."
                 } else if p.label().starts_with("Authenticator") {
@@ -1696,7 +1693,13 @@ pub(super) fn draw_lifecycle(
                     "Your MEGA password and authenticator code are never saved."
                 };
                 frame.render_widget(
-                    Paragraph::new(explanation).wrap(Wrap { trim: true }),
+                    Paragraph::new(p.error.unwrap_or(explanation))
+                        .style(if p.error.is_some() {
+                            Style::default().fg(WARNING)
+                        } else {
+                            Style::default()
+                        })
+                        .wrap(Wrap { trim: true }),
                     Rect::new(inner.x, inner.y, inner.width, 2),
                 );
                 frame.render_widget(
@@ -1718,21 +1721,8 @@ pub(super) fn draw_lifecycle(
                 );
                 frame.set_cursor_position((
                     inner.x + width.min(inner.width.saturating_sub(1)),
-                    inner.y + 3,
+                    field.y,
                 ));
-                if let Some(error) = p.error {
-                    frame.render_widget(
-                        Paragraph::new(error)
-                            .style(Style::default().fg(WARNING))
-                            .wrap(Wrap { trim: true }),
-                        Rect::new(
-                            inner.x,
-                            inner.y + 6,
-                            inner.width,
-                            2.min(inner.height.saturating_sub(6)),
-                        ),
-                    );
-                }
                 hint = if p.label().starts_with("Unlock") {
                     "Enter unlock · F2 sign in again · Esc quit"
                 } else {

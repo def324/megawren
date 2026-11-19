@@ -89,6 +89,16 @@ fn redirected_commands_explain_setup_and_validate_inputs_before_unlocking() {
     assert!(error.contains("local directory"));
     assert!(!error.contains("secretpart"));
     let state = dir.join(".megawren");
-    std::fs::write(state.join("session.enc"), b"unused fixture").unwrap();
+    let session = state.join("session.enc");
+    std::fs::write(&session, b"unused fixture").unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&session, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
     assert!(run(&["ls"]).contains("--unlock-stdin"));
+    let mut corrupt = vec![0; 84];
+    corrupt[..12].copy_from_slice(b"MGWSESS\0\x02\0\x01\x01");
+    std::fs::write(session, corrupt).unwrap();
+    assert!(run(&["ls", "--json"]).contains("Cannot read saved login"));
 }
