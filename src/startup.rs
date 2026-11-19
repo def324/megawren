@@ -1,25 +1,20 @@
 /// Keep account setup independent of loading the cloud's file tree.
 #[derive(Clone, Copy)]
 pub enum Purpose {
-    SaveLogin,
+    Login,
     UseFiles,
     Logout,
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Step {
-    SaveLogin,
     OfferRemember,
     LoadFiles,
 }
 pub fn steps(purpose: Purpose, new_session: bool) -> impl Iterator<Item = Step> {
-    match purpose {
-        Purpose::SaveLogin => [Some(Step::SaveLogin), None],
-        Purpose::UseFiles => [
-            new_session.then_some(Step::OfferRemember),
-            Some(Step::LoadFiles),
-        ],
-        Purpose::Logout => [None, None],
-    }
+    [
+        (new_session && !matches!(purpose, Purpose::Logout)).then_some(Step::OfferRemember),
+        matches!(purpose, Purpose::UseFiles).then_some(Step::LoadFiles),
+    ]
     .into_iter()
     .flatten()
 }
@@ -28,10 +23,10 @@ pub fn steps(purpose: Purpose, new_session: bool) -> impl Iterator<Item = Step> 
 mod tests {
     use super::*;
     #[test]
-    fn explicit_login_saves_without_loading_the_cloud() {
+    fn explicit_login_asks_before_saving_without_loading_the_cloud() {
         assert_eq!(
-            steps(Purpose::SaveLogin, true).collect::<Vec<_>>(),
-            [Step::SaveLogin]
+            steps(Purpose::Login, true).collect::<Vec<_>>(),
+            [Step::OfferRemember]
         );
     }
     #[test]

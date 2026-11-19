@@ -82,6 +82,7 @@ enum Action {
     None,
     Submit,
     Exit,
+    Back,
     SignInAgain,
 }
 impl Prompt {
@@ -93,6 +94,9 @@ impl Prompt {
     }
     pub fn mode(&self) -> InputMode {
         self.request.mode
+    }
+    pub fn setting_passphrase(&self) -> bool {
+        self.mode() == InputMode::Text && self.label().contains("passphrase")
     }
     pub fn display_value(&self) -> String {
         if self.hidden() {
@@ -128,6 +132,13 @@ impl Prompt {
             };
         }
         if key.code == KeyCode::Esc {
+            if self.setting_passphrase() {
+                return Action::Back;
+            }
+            if self.mode() == InputMode::Choice(Confirmation::WithoutPassphrase) {
+                self.choice = false;
+                return Action::Submit;
+            }
             return Action::Exit;
         }
         if matches!(self.mode(), InputMode::Choice(_)) {
@@ -588,6 +599,10 @@ fn terminal_app(
                         Action::Exit => {
                             prompt = None;
                             begin_exit(&app, &shared, &cancel);
+                        }
+                        Action::Back => {
+                            let p = prompt.take().unwrap();
+                            let _ = p.request.reply.send(Err(feedback::Back.into()));
                         }
                         Action::SignInAgain => {
                             let p = prompt.take().unwrap();

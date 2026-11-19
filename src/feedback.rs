@@ -15,11 +15,11 @@ pub enum Confirmation {
 impl Confirmation {
     pub fn question(self) -> &'static str {
         match self {
-            Self::Remember => "Remember login on this device?",
+            Self::Remember => "Save this login on this device?",
             Self::WithoutPassphrase => {
                 "Anyone who can read your saved login can access your MEGA account."
             }
-            Self::Replace => "Replace saved login? The old server session stays active.",
+            Self::Replace => "Replace the saved login on this device?",
             Self::Expired => "Saved login expired. Sign in again?",
         }
     }
@@ -60,6 +60,14 @@ impl std::fmt::Display for SignInAgain {
     }
 }
 impl std::error::Error for SignInAgain {}
+#[derive(Debug)]
+pub struct Back;
+impl std::fmt::Display for Back {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Go back")
+    }
+}
+impl std::error::Error for Back {}
 thread_local! { static SURFACE: RefCell<Option<Rc<dyn Surface>>> = const { RefCell::new(None) }; }
 pub struct Guard(Option<Rc<dyn Surface>>);
 pub fn install(surface: Rc<dyn Surface>) -> Guard {

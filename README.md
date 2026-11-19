@@ -24,7 +24,7 @@ Prebuilt archives for Apple Silicon, Intel Macs and x86-64 Linux are available o
 
 Run `megawren` to open the browser, or `./bin/megawren` from an unpacked archive.
 
-Sign in with your MEGA email, password, and authenticator code if you use one. Choose **Yes, save login** to stay signed in on this computer. Set a local passphrase, or leave it blank and confirm **Save anyway** to open the drive automatically. Without a passphrase, anyone who can read your saved login can access your MEGA account.
+Sign in with your MEGA email, password, and authenticator code if you use one. Press Enter on **Just this time** to browse until you quit. Choose **Save login** to stay signed in on this device. A local passphrase is optional. Without one, anyone who can read your saved login can open your drive.
 
 The first visit can take a while on a large drive. Remembering your login also saves the file list so it opens faster next time.
 
@@ -57,7 +57,7 @@ With one path, `get` downloads here and `put` uploads to `/`. With two or more p
 
 Downloads keep existing files unless you pass `--overwrite`. Uploads stop on a conflicting filename. If a batch fails, completed files stay in place and the command exits with an error. For a public MEGA link, run `megawren get`, paste the link at the hidden prompt, then choose a download directory. Press Enter to use the current directory.
 
-**From a script**, run `megawren login` once in a terminal. If you saved a passphrase, have your secret manager supply it on stdin using `--unlock-stdin`. This example receives it on file descriptor 3. With a passphrase-free login, just run `megawren ls --json /Reports`.
+**From a script**, first run `megawren login` in a terminal and choose to save the login. If you set a passphrase, have your secret manager supply it on stdin using `--unlock-stdin`. This example receives it on file descriptor 3. With a passphrase-free login, just run `megawren ls --json /Reports`.
 
 ```sh
 megawren --unlock-stdin ls --json /Reports <&3 >reports.json

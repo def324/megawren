@@ -167,16 +167,52 @@ const FIXTURE: &str = "  synthetic pässphrase  ";
 const SYNTHETIC_SESSION: &[u8] = b"offline lifecycle test session, no real account";
 
 #[test]
+fn just_this_time_is_the_default_and_skips_the_passphrase() {
+    let fixture = tempfile::tempdir().unwrap();
+    let mut p = Pty::new("save-choice", fixture.path());
+    p.until("device?");
+    p.type_bytes(b"\r");
+    p.finish(0);
+    assert!(!String::from_utf8_lossy(&p.output).contains("(optional)"));
+    assert!(!fixture.path().join("state/session.enc").exists());
+}
+
+#[test]
+fn backing_out_of_replacement_preserves_the_saved_login() {
+    let fixture = tempfile::tempdir().unwrap();
+    let state = crate::state::State::at(fixture.path().join("state")).unwrap();
+    let saved = crate::vault::seal(b"original", SYNTHETIC_SESSION).unwrap();
+    state.save(&saved).unwrap();
+    let mut p = Pty::new("save-choice", fixture.path());
+    p.until("Replace");
+    p.type_bytes(b"y\r");
+    p.until("(opt");
+    p.type_bytes(b"x\r");
+    p.until("local passphrase");
+    p.output.clear();
+    p.type_bytes(&[27]);
+    p.until("(opt");
+    p.output.clear();
+    p.type_bytes(&[27]);
+    p.until("device?");
+    p.type_bytes(b"\r");
+    p.finish(0);
+    assert_eq!(state.read_vault().unwrap(), saved);
+}
+
+#[test]
 fn empty_passphrase_needs_explicit_consent_and_then_opens_automatically() {
     let fixture = tempfile::tempdir().unwrap();
-    let mut p = Pty::new("choose-passphrase", fixture.path());
-    p.until("(optional)");
+    let mut p = Pty::new("save-choice", fixture.path());
+    p.until("device?");
+    p.type_bytes(b"y\r");
+    p.until("(opt");
     p.type_bytes(b"\r");
     p.until("anyway");
     assert!(!fixture.path().join("state/session.enc").exists());
-    p.type_bytes(b"\r"); // The default returns to the field.
     p.output.clear();
-    p.until("(optional)");
+    p.type_bytes(b"\r"); // The default returns to the field.
+    p.until("(opt");
     p.type_bytes(b"\ry\r");
     p.finish(0);
     let stored = std::fs::read(fixture.path().join("state/session.enc")).unwrap();
@@ -190,8 +226,10 @@ fn empty_passphrase_needs_explicit_consent_and_then_opens_automatically() {
 #[test]
 fn confirmation_mismatch_can_be_corrected_with_a_one_character_passphrase() {
     let fixture = tempfile::tempdir().unwrap();
-    let mut p = Pty::new("choose-passphrase", fixture.path());
-    p.until("(optional)");
+    let mut p = Pty::new("save-choice", fixture.path());
+    p.until("device?");
+    p.type_bytes(b"y\r");
+    p.until("(opt");
     p.type_bytes(b"x\ry\r");
     p.until("didn");
     p.type_bytes(b"x\rx\r");
@@ -409,9 +447,11 @@ fn application_child() {
     let before = terminal_flags(0);
     let result = application_inner(cancel.clone(), |frontend| {
         let state = crate::state::State::at(fixture.join("state"))?;
-        if mode == "choose-passphrase" {
-            let pass = crate::choose_passphrase(&cancel)?;
-            state.save(&crate::vault::seal(pass.as_bytes(), SYNTHETIC_SESSION)?)?;
+        if mode == "save-choice" {
+            let replacing = state.path.join("session.enc").try_exists()?;
+            if let Some(pass) = crate::saved_login_passphrase(replacing, &cancel)? {
+                state.save(&crate::vault::seal(pass.as_bytes(), SYNTHETIC_SESSION)?)?;
+            }
             return Ok(());
         }
         if mode == "sequence" {

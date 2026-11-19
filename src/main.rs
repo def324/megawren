@@ -46,7 +46,7 @@ struct Args {
 enum Command {
     /// Preview a small remote text file or image on request
     Preview { remote: String },
-    /// Save or replace a login, with an optional local passphrase
+    /// Sign in and choose whether to save the login
     Login,
     /// List a remote directory
     Ls {
@@ -150,6 +150,24 @@ fn account_login(backend: &mut backend::Backend, cancel: &AtomicBool) -> Result<
     let password = prompt("Password: ", cancel)?;
     backend.login(&email, &password)
 }
+fn saved_login_passphrase(
+    replacing: bool,
+    cancel: &AtomicBool,
+) -> Result<Option<Zeroizing<String>>> {
+    let choice = if replacing {
+        Confirmation::Replace
+    } else {
+        Confirmation::Remember
+    };
+    while confirm_save(choice, cancel)? {
+        match choose_passphrase(cancel) {
+            Ok(pass) => return Ok(Some(pass)),
+            Err(e) if e.is::<feedback::Back>() => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(None)
+}
 fn choose_passphrase(cancel: &AtomicBool) -> Result<Zeroizing<String>> {
     let mut error = None;
     loop {
@@ -160,18 +178,20 @@ fn choose_passphrase(cancel: &AtomicBool) -> Result<Zeroizing<String>> {
             }
             continue;
         }
-        if *pass == *prompt("Confirm local passphrase: ", cancel)? {
-            return Ok(pass);
+        match prompt("Confirm local passphrase: ", cancel) {
+            Ok(confirmation) if *confirmation == *pass => return Ok(pass),
+            Ok(_) => error = Some("Passphrases didn’t match. Try again."),
+            Err(e) if e.is::<feedback::Back>() => continue,
+            Err(e) => return Err(e),
         }
-        error = Some("Passphrases didn’t match. Try again.");
     }
 }
 fn save_login(
     state: &state::State,
     backend: &mut backend::Backend,
+    pass: &str,
     cancel: &AtomicBool,
 ) -> Result<()> {
-    let pass = choose_passphrase(cancel)?;
     let session = backend.session()?;
     feedback::progress(Stage::SavingLogin, 0, 0, 0, false);
     let sealed = vault::seal(pass.as_bytes(), session.as_bytes())?;
@@ -260,14 +280,6 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
             "No saved login. Run megawren login in a terminal."
         );
     }
-    let replacing = matches!(args.command, Some(Command::Login))
-        && state.path.join("session.enc").try_exists()?;
-    if replacing {
-        let answer = line("Replace saved login? [y/N]: ", &cancelled)?;
-        if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-            return Ok(());
-        }
-    }
     let mut backend = backend::Backend::deferred(&state, cancelled.clone())?;
     let result = (|| -> Result<()> {
         let mut startup_feedback = None;
@@ -297,15 +309,9 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                 let pass = match unlock(args.unlock_stdin, automatic, error, &cancelled) {
                     Ok(pass) => pass,
                     Err(e) if e.is::<feedback::SignInAgain>() => {
-                        if !feedback::confirm(Confirmation::Replace, &cancelled)
-                            .context("Interactive recovery is unavailable")??
-                        {
-                            continue;
-                        }
                         account_lock.unlock()?;
                         account_lock = state.lock(true)?;
                         account_login(&mut backend, &cancelled)?;
-                        save_login(&state, &mut backend, &cancelled)?;
                         break None;
                     }
                     Err(e) => return Err(e),
@@ -351,7 +357,6 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                     account_lock = state.lock(true)?;
                     backend = backend::Backend::deferred(&state, cancelled.clone())?;
                     account_login(&mut backend, &cancelled)?;
-                    save_login(&state, &mut backend, &cancelled)?;
                 }
             }
         } else {
@@ -363,16 +368,27 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
         }
         if !public {
             let purpose = match &args.command {
-                Some(Command::Login) => startup::Purpose::SaveLogin,
+                Some(Command::Login) => startup::Purpose::Login,
                 Some(Command::Logout) => startup::Purpose::Logout,
                 _ => startup::Purpose::UseFiles,
             };
             for step in startup::steps(purpose, !backend.remembered) {
                 match step {
-                    startup::Step::SaveLogin => save_login(&state, &mut backend, &cancelled)?,
                     startup::Step::OfferRemember => {
-                        if confirm_save(Confirmation::Remember, &cancelled)? {
-                            save_login(&state, &mut backend, &cancelled)?;
+                        let replacing = state.path.join("session.enc").try_exists()?;
+                        if let Some(pass) = saved_login_passphrase(replacing, &cancelled)? {
+                            save_login(&state, &mut backend, &pass, &cancelled)?;
+                            if replacing {
+                                feedback::note(
+                                    "You can end the previous session in MEGA’s session settings.",
+                                );
+                            }
+                        } else if matches!(purpose, startup::Purpose::Login) {
+                            feedback::note(if replacing {
+                                "Kept the previous saved login."
+                            } else {
+                                "Login not saved."
+                            });
                         }
                     }
                     startup::Step::LoadFiles => {
@@ -433,13 +449,7 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                 preview::plan(&entry.name, entry.size, entry.folder)?;
                 feedback::preview(&mut backend, entry)?;
             }
-            Some(Command::Login) => {
-                if replacing {
-                    eprintln!(
-                        "The old server session remains active; end it in MEGA's session settings."
-                    );
-                }
-            }
+            Some(Command::Login) => (),
             Some(Command::Logout) => {
                 backend.revoke()?;
                 std::fs::remove_file(state.path.join("session.enc"))?;
