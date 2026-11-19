@@ -1656,8 +1656,8 @@ pub(super) fn draw_lifecycle(
             }
             InputMode::Choice(choice) => {
                 let (no, yes) = match choice {
-                    Confirmation::Remember => (" Just this time ", " Save login "),
-                    Confirmation::Replace => (" Just this time ", " Replace login "),
+                    Confirmation::Remember => (" Don’t save ", " Save login "),
+                    Confirmation::Replace => (" Keep existing ", " Replace login "),
                     Confirmation::WithoutPassphrase => (" Go back ", " Save anyway "),
                     Confirmation::Expired => (" No ", " Sign in again "),
                 };

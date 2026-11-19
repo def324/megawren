@@ -167,10 +167,10 @@ const FIXTURE: &str = "  synthetic pässphrase  ";
 const SYNTHETIC_SESSION: &[u8] = b"offline lifecycle test session, no real account";
 
 #[test]
-fn just_this_time_is_the_default_and_skips_the_passphrase() {
+fn dont_save_is_the_default_and_skips_the_passphrase() {
     let fixture = tempfile::tempdir().unwrap();
     let mut p = Pty::new("save-choice", fixture.path());
-    p.until("device?");
+    p.until("Don’t save");
     p.type_bytes(b"\r");
     p.finish(0);
     assert!(!String::from_utf8_lossy(&p.output).contains("(optional)"));
@@ -184,7 +184,7 @@ fn backing_out_of_replacement_preserves_the_saved_login() {
     let saved = crate::vault::seal(b"original", SYNTHETIC_SESSION).unwrap();
     state.save(&saved).unwrap();
     let mut p = Pty::new("save-choice", fixture.path());
-    p.until("Replace");
+    p.until("Keep existing");
     p.type_bytes(b"y\r");
     p.until("(opt");
     p.type_bytes(b"x\r");

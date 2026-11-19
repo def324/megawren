@@ -24,7 +24,7 @@ Prebuilt archives for Apple Silicon, Intel Macs and x86-64 Linux are available o
 
 Run `megawren` to open the browser, or `./bin/megawren` from an unpacked archive.
 
-Sign in with your MEGA email, password, and authenticator code if you use one. Press Enter on **Just this time** to browse until you quit. Choose **Save login** to stay signed in on this device. A local passphrase is optional. Without one, anyone who can read your saved login can open your drive.
+Sign in with your MEGA email, password, and authenticator code if you use one. **Don’t save** opens your drive for this visit. **Save login** keeps you signed in on this device. A local passphrase is optional. Without one, anyone who can read your saved login can open your drive.
 
 The first visit can take a while on a large drive. Remembering your login also saves the file list so it opens faster next time.
 
