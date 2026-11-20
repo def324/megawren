@@ -81,9 +81,11 @@ fi
 dat=$(ls /usr/share/icu/*/icudt*l.dat)
 icu=$(basename "$dat" l.dat)
 rm -rf "$deps/icudata" && mkdir "$deps/icudata"
-genccode -o -e "$icu" -d "$deps/icudata" "$dat"
+# C output compiles for any CPU. genccode's direct object output misdetects ARM64.
+genccode -e "$icu" -d "$deps/icudata" "$dat"
+cc -c -o "$deps/icudata/icudata.o" "$deps/icudata"/*.c
 rm -f "$prefix/lib/libicudata.a"
-ar rcs "$prefix/lib/libicudata.a" "$deps/icudata"/*.o
+ar rcs "$prefix/lib/libicudata.a" "$deps/icudata/icudata.o"
 echo "Embedding $(basename "$dat") ($(du -h "$dat" | cut -f1)) as ${icu}_dat"
 
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
