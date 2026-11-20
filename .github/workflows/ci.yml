@@ -142,6 +142,19 @@ jobs:
           bin/megawren status
       - name: Test install.sh
         run: sh scripts/test-install.sh target/dist/*.tar.gz
+      - name: Build .deb and .rpm
+        run: sh scripts/build-linux-packages.sh target/dist/megawren-*-linux-musl.tar.gz
+      - name: Install and remove the .deb
+        run: |
+          sudo apt-get install -y ./target/dist/megawren_*.deb
+          megawren --version
+          sudo apt-get remove -y megawren
+          if command -v megawren; then exit 1; fi
+      - name: Install and remove the .rpm on Fedora
+        run: >-
+          docker run --rm -v "$PWD/target/dist:/packages:ro" fedora:44 sh -ec
+          'dnf install -y /packages/megawren-*.rpm; megawren --version; megawren status;
+          dnf remove -y megawren; if command -v megawren; then exit 1; fi'
       - uses: actions/upload-artifact@v4
         with:
           name: megawren-static-${{ matrix.runner }}
