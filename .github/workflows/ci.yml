@@ -44,9 +44,11 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
           brew install cmake pkgconf cryptopp libsodium icu4c
       # Both caches reuse results only when sources, flags and toolchain match.
+      # The ccache key ends with "-sdk" because restores match by prefix, and
+      # "macos-15" would otherwise also match the "macos-15-intel" cache.
       - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
-          key: sdk-${{ matrix.runner }}
+          key: ${{ matrix.runner }}-sdk
           max-size: 1G
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
