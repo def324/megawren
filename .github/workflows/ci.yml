@@ -32,13 +32,29 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy
+      # The runner image already has a newer CMake on PATH. Ubuntu's package
+      # was most of this download, so it is installed only if missing.
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y cmake pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev patchelf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev patchelf
+          command -v cmake || sudo apt-get install -y cmake
       - if: runner.os == 'macOS'
         run: |
           echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
           brew install cmake pkgconf cryptopp libsodium icu4c
+      # Both caches reuse results only when sources, flags and toolchain match.
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: sdk-${{ matrix.runner }}
+          max-size: 1G
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ${{ matrix.runner }}
       - run: ./scripts/build-sdk.sh
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - run: cargo fmt --check
       - run: ./scripts/cargo.sh test --locked
       - run: ./scripts/cargo.sh clippy --all-targets --locked -- -D warnings
