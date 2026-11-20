@@ -26,6 +26,7 @@ zeroize = { version = "1", features = ["derive"] }
 zstd = { version = "0.13", default-features = false }
 
 [build-dependencies]
+cc = "1"
 cxx-build = "1"
 pkg-config = "0.3"
 

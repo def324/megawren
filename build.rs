@@ -7,6 +7,8 @@ fn main() {
         "native/client.cpp",
         "native/cache.hpp",
         "native/cache.cpp",
+        "native/musl_clockwait.h",
+        "native/musl_clockwait.c",
     ] {
         println!("cargo:rerun-if-changed={file}");
     }
@@ -27,9 +29,13 @@ fn main() {
     for path in sdk.include_paths.iter().chain(&sodium.include_paths) {
         build.include(path);
     }
-    build.compile("megawren-bridge");
     // musl builds link every native dependency into one self-contained binary.
-    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("musl") {
+    let musl = std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("musl");
+    if musl {
+        build.flag("-include").flag("native/musl_clockwait.h");
+    }
+    build.compile("megawren-bridge");
+    if musl {
         link_statically();
         return;
     }
@@ -102,5 +108,11 @@ fn link_statically() {
             }
         }
     }
+    // The SDK and the bridge call this through musl_clockwait.h.
+    cc::Build::new()
+        .file("native/musl_clockwait.c")
+        .cargo_metadata(false)
+        .compile("megawren-musl");
+    println!("cargo:rustc-link-lib=static=megawren-musl");
     println!("cargo:rustc-link-lib=static=stdc++");
 }

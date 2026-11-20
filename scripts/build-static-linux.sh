@@ -75,8 +75,11 @@ if [ ! -f "$prefix/lib/libcurl.a" ]; then
 fi
 
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
+# native/musl_clockwait.h relies on this libstdc++ switch. Fail loudly if it moves.
+grep -q '_GLIBCXX_USE_PTHREAD_COND_CLOCKWAIT' /usr/include/c++/*/bits/std_mutex.h
 # -k reports every file that fails to compile, not only the first.
-MAKEFLAGS=-k BUILD_JOBS=$jobs "$root/scripts/build-sdk.sh" \
+CXXFLAGS="-include $root/native/musl_clockwait.h" MAKEFLAGS=-k BUILD_JOBS=$jobs \
+    "$root/scripts/build-sdk.sh" \
     -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DCMAKE_PROJECT_INCLUDE="$root/scripts/static-linux-sdk.cmake"
 
