@@ -79,3 +79,35 @@ jobs:
         with:
           name: megawren-${{ matrix.runner }}
           path: target/dist/
+  # One statically linked binary per CPU runs on any Linux, including NAS systems.
+  static-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build in Alpine Linux
+        run: >-
+          docker run --rm --platform ${{ matrix.platform }} -e RUST_VERSION=1.99.1
+          -v "$PWD:/work/megawren" -w /work/megawren alpine:3.24 sh scripts/build-static-linux.sh
+      - name: Run unpacked client on the host
+        run: |
+          mkdir -p "$RUNNER_TEMP/megawren-package"
+          tar -xzf target/dist/*.tar.gz -C "$RUNNER_TEMP/megawren-package"
+          cd "$RUNNER_TEMP/megawren-package"/megawren-*
+          file bin/megawren
+          cat RUNTIME.txt
+          bin/megawren --help
+          bin/megawren status
+      - uses: actions/upload-artifact@v4
+        with:
+          name: megawren-static-${{ matrix.runner }}
+          path: target/dist/

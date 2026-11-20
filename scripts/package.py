@@ -122,7 +122,19 @@ def macho(root):
     shutil.copyfile(source, root / "licenses/Crypto++.txt")
 
 
+def linux_static(root):
+    """A musl build carries every library inside the executable."""
+    (root / "lib").rmdir()
+    headers = output("readelf", "--program-headers", "--dynamic", root / "bin/megawren")
+    if "(NEEDED)" in headers or "INTERP" in headers:
+        raise RuntimeError("The static Linux executable still loads shared libraries")
+    (root / "RUNTIME.txt").write_text("Built on " + platform.freedesktop_os_release()["PRETTY_NAME"] +
+        " with musl\nStatically linked. Needs no system libraries.\n")
+
+
 def linux(root):
+    if not any(SDK.glob("libSDKlib.so*")):
+        return linux_static(root)
     source, = [p for p in SDK.glob("libSDKlib.so*") if p.is_file() and not p.is_symlink()]
     soname = output("patchelf", "--print-soname", source)
     lib = root / "lib" / soname
@@ -168,7 +180,7 @@ def main():
             "Run `bin/megawren --help` for commands and `bin/megawren status` for local storage paths.\n")
         notices(root / "licenses", metadata["packages"])
         {"Darwin": macho, "Linux": linux}[platform.system()](root)
-        for binary in [exe, *(root / "lib").iterdir()]:
+        for binary in [exe, *(root / "lib").glob("*")]:
             data = binary.read_bytes()
             if any(os.fsencode(str(path) + "/") in data for path in (ROOT, Path.home())):
                 raise RuntimeError(f"{binary.name} contains a builder path. Rebuild with the release flags.")

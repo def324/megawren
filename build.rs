@@ -28,6 +28,11 @@ fn main() {
         build.include(path);
     }
     build.compile("megawren-bridge");
+    // musl builds link every native dependency into one self-contained binary.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("musl") {
+        link_statically();
+        return;
+    }
     // GNU ld discards as-needed libraries that precede the static C++ bridge.
     for library in [&sdk, &sodium] {
         for path in &library.link_paths {
@@ -57,4 +62,45 @@ fn main() {
             }
         }
     }
+}
+
+/// Links the static SDK and its dependency chain in the order pkg-config resolves.
+/// The build sets CXXSTDLIB to an empty value so that cc does not also link the
+/// C++ runtime dynamically. It is linked statically here, after everything that
+/// needs it.
+fn link_statically() {
+    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
+    let pkg_config = std::env::var("PKG_CONFIG").unwrap_or_else(|_| "pkg-config".into());
+    let packages = [
+        "sdklib",
+        "libcurl",
+        "sqlite3",
+        "libsodium",
+        "libcrypto++",
+        "icu-i18n",
+        "icu-uc",
+        "openssl",
+    ];
+    let output = std::process::Command::new(pkg_config)
+        .args(["--static", "--libs"])
+        .args(packages)
+        .output()
+        .expect("pkg-config is required");
+    assert!(
+        output.status.success(),
+        "pkg-config --static failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for flag in String::from_utf8(output.stdout).unwrap().split_whitespace() {
+        if let Some(path) = flag.strip_prefix("-L") {
+            println!("cargo:rustc-link-search=native={path}");
+        } else if let Some(name) = flag.strip_prefix("-l") {
+            // musl's libc.a provides the system libraries, and Rust's standard
+            // library links it. The C++ runtime is linked last, below.
+            if !matches!(name, "c" | "m" | "dl" | "pthread" | "rt" | "stdc++") {
+                println!("cargo:rustc-link-lib=static={name}");
+            }
+        }
+    }
+    println!("cargo:rustc-link-lib=static=stdc++");
 }

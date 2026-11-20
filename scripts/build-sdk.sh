@@ -54,6 +54,12 @@ cp "$sdk/include/megaapi.h" "$root/target/sdk/include/"
 cp "$root/target/sdk-build/sdklib.pc" "$root/target/sdk/lib/pkgconfig/"
 case $(uname -s) in
     Darwin) cp -P "$root"/target/sdk-build/libSDKlib*.dylib "$root/target/sdk/lib/" ;;
-    Linux) cp -P "$root"/target/sdk-build/libSDKlib.so* "$root/target/sdk/lib/" ;;
+    Linux)
+        # The static Linux build passes -DBUILD_SHARED_LIBS=OFF and gets an archive.
+        if [ -e "$root/target/sdk-build/libSDKlib.a" ]; then
+            cp "$root/target/sdk-build/libSDKlib.a" "$root/target/sdk/lib/"
+        else
+            cp -P "$root"/target/sdk-build/libSDKlib.so* "$root/target/sdk/lib/"
+        fi ;;
     *) echo 'Native packaging script currently supports Unix hosts.' >&2; exit 1 ;;
 esac
