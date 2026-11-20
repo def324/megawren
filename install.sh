@@ -1,12 +1,12 @@
 #!/bin/sh
 # Installs Megawren on Linux or macOS from its GitHub release.
 #
-#   curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh | sh
+#   curl -fsSL https://def324.github.io/megawren/install.sh | sh
 #
 # Uninstall everything this script installed:
 #
 #   ~/.local/share/megawren/uninstall.sh
-#   curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh | sh -s -- --uninstall
+#   curl -fsSL https://def324.github.io/megawren/install.sh | sh -s -- --uninstall
 #
 # Add --purge to also sign out of MEGA and delete ~/.megawren (your saved
 # login and file index). Run with --help for all options.

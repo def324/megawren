@@ -9,7 +9,7 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 ## Features
 
 - Sign in with two-factor authentication. Save your login with an optional local passphrase.
-- Upload and download files or folders while browsing. Track and cancel transfers in the TUI.
+- Upload and download files or folders, and keep working while they transfer. Follow or cancel each transfer.
 - Rename, move, or copy selected items. Restore files and folders from the Rubbish Bin.
 - Preview text files and images on request.
 - Use `ls`, `get`, and `put` in scripts. `ls --json` gives a machine-readable listing.
@@ -21,7 +21,7 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 | Method | Command |
 | --- | --- |
 | Homebrew, macOS or Linux | `brew install def324/tap/megawren` |
-| Install script, macOS or Linux (including NAS) | `curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh \| sh` |
+| Install script, macOS or Linux (including NAS) | `curl -fsSL https://def324.github.io/megawren/install.sh \| sh` |
 | Debian, Ubuntu, Raspberry Pi OS | `sudo apt install ./megawren_*.deb` after downloading the `.deb` |
 | Fedora, RHEL, openSUSE | `sudo dnf install ./megawren-*.rpm` after downloading the `.rpm` |
 | Docker or Podman | `docker run -it --rm -v megawren:/data ghcr.io/def324/megawren` |
@@ -49,33 +49,39 @@ Removing the program keeps your saved login and file index in `~/.megawren`, so 
 - With the install script, run `~/.local/share/megawren/uninstall.sh --purge`. It signs out of MEGA, deletes `~/.megawren`, and then removes the program.
 - Otherwise, run `megawren logout` first so the saved session ends on MEGA's servers, then delete `~/.megawren`. For the container, run `docker run -it --rm -v megawren:/data ghcr.io/def324/megawren logout`, then `docker volume rm megawren`.
 
-If the uninstaller is gone, the install script can do the same: `curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh | sh -s -- --uninstall --purge`. Leave out `--purge` to keep `~/.megawren`. If you installed with `--prefix`, pass the same prefix.
+If the uninstaller is gone, the install script can do the same: `curl -fsSL https://def324.github.io/megawren/install.sh | sh -s -- --uninstall --purge`. Leave out `--purge` to keep `~/.megawren`. If you installed with `--prefix`, pass the same prefix.
 
-## Open your drive
+## Usage
 
-Run `megawren` to open the browser, or `./bin/megawren` from an unpacked archive.
+### Start Megawren
 
-Sign in with your MEGA email, password, and authenticator code if you use one. **Don’t save** opens your drive for this visit. **Save login** keeps you signed in on this device. A local passphrase is optional. Without one, anyone who can read your saved login can open your drive.
+Open a terminal and run `megawren`. If you unpacked an archive instead of installing, run `./bin/megawren` from its folder. Megawren fills the terminal window and lists the files and folders in your MEGA account, starting with **Cloud drive**, MEGA's name for your main storage.
 
-The first visit can take a while on a large drive. Remembering your login also saves the file list so it opens faster next time.
+The first time, sign in with your MEGA email and password, plus the six-digit code from your authenticator app if your account uses two-factor authentication. Megawren then asks whether to save the login on this computer:
 
-## Find and transfer files
+- **Don't save** signs you out when you quit, so you sign in again next time.
+- **Save login** keeps you signed in. You can protect the saved login with a local passphrase, which Megawren then asks for when it starts. Without one, anyone who can read your files on this computer can get into your MEGA account.
 
-Use ↑ and ↓ to move, Enter to open a folder, and ← to go back. Press **i** to see a folder’s details and actions without opening it. Enter on a file opens the same panel. To work on several items at once, mark each with Space, then press Enter.
+A large account can take a while to load the first time. A saved login also keeps an encrypted copy of your file list, so later starts are faster.
 
-| To | In the browser |
+### Find your way around
+
+Use ↑ and ↓ to move, Enter to open a folder, and ← to go back. Press **i** to see a folder's details and what you can do with it, without opening it. Enter on a file shows the same. To work on several items at once, mark each one with Space, then press Enter. **?** lists every shortcut, and **q** quits.
+
+| To | Do this |
 | --- | --- |
-| Download | Focus a file or mark several. Press **d**, open the local folder where you want them, then press **d** again. |
-| Upload | Open the destination on MEGA. Press **u**, mark local files or folders with Space, then press **u** again. |
-| Preview | Press **p** on a file or run `megawren preview /path/to/file`. **Esc** closes the viewer. |
-| Check a transfer | Press **t** for filenames and progress. Use ↑ and ↓ to see each destination. **x** cancels the selected transfer (the whole batch for a multi-file selection). **Shift+X** cancels all. Both ask first. |
-| Recover an item | Press **2** for the Rubbish Bin. Mark the item, press Enter, and choose **Restore to original folder**. Press **1** to return to your drive. |
+| Download | Pick a file, or mark several. Press **d**, go to the folder on your computer where they should go, then press **d** again. |
+| Upload | Open the MEGA folder they should go into. Press **u**, mark the files or folders on your computer with Space, then press **u** again. |
+| Preview a file | Press **p**. **Esc** closes the preview. To open one file directly, run `megawren preview /path/to/file`. |
+| Follow transfers | Press **t** to see each file and its progress. ↑ and ↓ show where each one is going. **x** cancels the selected transfer, or the whole batch if you started several files together. **Shift+X** cancels everything. Both ask first. |
+| Delete | Press **Delete** to move the selection to the Rubbish Bin. Megawren asks first. |
+| Restore something you deleted | Press **2** to open the **Rubbish Bin**. Mark the item, press Enter, and choose **Restore to original folder**. Press **1** to return to **Cloud drive**. |
 
-Previews load only when opened. For supported text files up to 1 MiB, the viewer reads the first 128 KiB or less. JPEG, PNG, WebP, and GIF images have a 100 MiB file limit.
+Previews load only when you ask for one. For text files up to 1 MiB, the preview shows up to the first 128 KiB. JPEG, PNG, WebP, and GIF images up to 100 MiB are supported. If file icons show up as empty squares, your terminal font lacks them. Press **F3** to switch to plain icons.
 
-Press **Delete** to move a selection to the Rubbish Bin. You’ll be asked to confirm. **?** opens or closes the shortcut list. If file icons show up as squares, press **F3** in the browser or a file picker to switch to plain icons. Press **q** to quit.
+### From the command line
 
-## From the shell
+Megawren also works without the full-screen view, which suits quick tasks and scripts.
 
 ```sh
 megawren ls /Photos

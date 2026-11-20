@@ -1,0 +1,40 @@
+name: pages
+# Publishes install.sh at https://def324.github.io/megawren/install.sh
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble the site
+        run: |
+          mkdir site
+          cp install.sh site/
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>Megawren</title>
+          <meta http-equiv="refresh" content="0; url=https://github.com/def324/megawren">
+          <a href="https://github.com/def324/megawren">Megawren on GitHub</a>
+          HTML
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v5
