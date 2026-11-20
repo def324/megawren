@@ -1,0 +1,60 @@
+name: security
+# Looks for newly disclosed vulnerabilities every Monday, even without new
+# commits. A failed scheduled run emails the maintainer who set the schedule.
+on:
+  push:
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - deny.toml
+      - .github/workflows/security.yml
+  pull_request:
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - deny.toml
+      - .github/workflows/security.yml
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  # RustSec advisories, licenses, and crate sources. See deny.toml.
+  cargo-deny:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories bans licenses sources
+  # Rescans what people downloaded: the SBOMs attached to the latest release.
+  release-sbom:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Download the latest release's SBOMs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir sboms
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern '*.cdx.json' --dir sboms || true
+          ls -l sboms
+      - name: Scan with Grype
+        run: |
+          if ! ls sboms/*.cdx.json >/dev/null 2>&1; then
+            echo "::notice::The latest release has no SBOMs to scan yet."
+            exit 0
+          fi
+          status=0
+          for sbom in sboms/*.cdx.json; do
+            echo "== $(basename "$sbom")"
+            docker run --rm -v "$PWD/sboms:/sboms:ro" -v grype-db:/root/.cache/grype \
+              anchore/grype:v0.121.2@sha256:6a36234da13f9faa327306ac0b3dab3405cfa2b4eb20c8f904125a8707863913 \
+              "sbom:/sboms/$(basename "$sbom")" --only-fixed --fail-on high || status=1
+          done
+          exit $status

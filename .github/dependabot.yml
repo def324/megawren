@@ -1,0 +1,18 @@
+# Weekly update pull requests, grouped so each ecosystem opens at most one.
+# The MEGA SDK submodule is updated by hand, since a new SDK needs review.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      rust-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

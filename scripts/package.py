@@ -10,9 +10,15 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 SDK = ROOT / "target/sdk/lib"
+# C and C++ libraries inside the archive, for the SBOM. macho() and linux_static() fill it.
+NATIVE = []
+# CPE vendor:product, so scanners can match libraries that have no package-manager identity.
+CPES = {"curl": "haxx:curl", "cryptopp": "cryptopp:crypto\\+\\+", "icu4c": "icu-project:international_components_for_unicode",
+        "libsodium": "libsodium_project:libsodium", "openssl": "openssl:openssl", "sqlite": "sqlite:sqlite", "zlib": "zlib:zlib"}
 
 
 def output(*args):
@@ -50,6 +56,60 @@ def notices(dest, packages):
             target = dest / "mega" / source.relative_to(mega)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+
+
+def native(name, version, purl=None, product=None):
+    component = {"type": "library", "name": name, "version": version}
+    if purl:
+        component["purl"] = purl
+    if product in CPES:
+        component["cpe"] = f"cpe:2.3:a:{CPES[product]}:{version}:*:*:*:*:*:*:*"
+    NATIVE.append(component)
+
+
+def pkgconfig_version(path):
+    match = re.search(r"^Version: *(\S+)", path.read_text(), re.M)
+    return match[1] if match else "unknown"
+
+
+def sbom(path, version, host, packages):
+    """Write a CycloneDX SBOM listing everything compiled into the archive."""
+    licenses = {(p["name"], p["version"]): p.get("license") for p in packages}
+    crates = set()
+    tree = output("cargo", "tree", "--locked", "--offline", "-e", "normal", "--target", host,
+                  "--prefix", "none", "--format", "{p}")
+    for line in tree.splitlines():
+        match = re.match(r"(\S+) v(\S+)$", line.removesuffix(" (*)").strip())
+        if match and match[1] != "megawren":
+            crates.add((match[1], match[2]))
+    components = []
+    for crate, crate_version in sorted(crates):
+        component = {"type": "library", "name": crate, "version": crate_version,
+                     "purl": f"pkg:cargo/{crate}@{crate_version}"}
+        if licenses.get((crate, crate_version)):
+            component["licenses"] = [{"expression": licenses[(crate, crate_version)]}]
+        components.append(component)
+    commit = output("git", "rev-parse", "HEAD:vendor/mega")
+    components.append({"type": "library", "name": "mega-sdk", "version": pkgconfig_version(SDK / "pkgconfig/sdklib.pc"),
+                       "purl": f"pkg:github/meganz/sdk@{commit}"})
+    components.extend(NATIVE)
+    doc = {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
+           "serialNumber": "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"megawren/{version}/{host}")),
+           "metadata": {"component": {"type": "application", "name": "megawren", "version": version,
+                                      "purl": f"pkg:github/def324/megawren@v{version}"},
+                        "properties": [{"name": "target", "value": host}]},
+           "components": components}
+    path.write_text(json.dumps(doc, indent=2) + "\n")
+
+
+def check_auditable(exe):
+    """cargo auditable embeds the dependency list, so anyone can audit the shipped binary."""
+    listing = output("otool", "-l", exe) if platform.system() == "Darwin" else output("readelf", "-S", exe)
+    if ".dep-v0" not in listing:
+        message = "The executable has no embedded dependency list. Build it with cargo auditable."
+        if os.environ.get("CI"):
+            raise RuntimeError(message)
+        print("warning: " + message)
 
 
 def check_macos_version(binary):
@@ -98,6 +158,11 @@ def macho(root):
                 dst.chmod(0o755)
                 queue.append((dst, src))
                 prefix = src.resolve().parent.parent
+                cellar = re.search(r"/Cellar/([^/]+)/([^/]+)/", str(src.resolve()))
+                if cellar:
+                    formula, release = cellar[1], re.sub(r"_\d+$", "", cellar[2])
+                    if not any(c["name"] == formula for c in NATIVE):
+                        native(formula, release, f"pkg:brew/{formula.replace('@', '%40')}@{release}", formula.split("@")[0])
                 if (prefix / "LICENSE").is_file():
                     shutil.copyfile(prefix / "LICENSE", root / "licenses" / (prefix.parent.name + ".txt"))
             changes.extend(["-change", dep, ("@executable_path/../lib/" if binary == exe else "@loader_path/") + dst.name])
@@ -139,6 +204,20 @@ def linux_static(root):
     for name in ["curl.txt", "Crypto++.txt"]:
         if not (licenses / name).is_file():
             raise RuntimeError(f"Missing {name} for the static Linux archive")
+    # Alpine packages carry Alpine's version, so scanners use Alpine's security data.
+    alpine = ".".join(Path("/etc/alpine-release").read_text().split(".")[:2])
+    for package, upstream in [("musl", "musl"), ("openssl-libs-static", "openssl"), ("icu-static", "icu"),
+                              ("icu-data-en", "icu"), ("sqlite-static", "sqlite"), ("libsodium-static", "libsodium"),
+                              ("zlib-static", "zlib"), ("libstdc++-dev", "gcc")]:
+        line = output("apk", "list", "--installed", package)
+        release = line.removeprefix(package + "-").split(" ")[0]
+        arch = line.split(" ")[1]
+        native(package, release, f"pkg:apk/alpine/{package}@{release}?arch={arch}&upstream={upstream}&distro=alpine-{alpine}")
+    prefix = ROOT / "target/static-deps/prefix/lib/pkgconfig"
+    curl = pkgconfig_version(prefix / "libcurl.pc")
+    native("curl", curl, f"pkg:generic/curl@{curl}", "curl")
+    cryptopp = pkgconfig_version(prefix / "libcrypto++.pc")
+    native("cryptopp", cryptopp, f"pkg:generic/cryptopp@{cryptopp}", "cryptopp")
 
 
 def linux(root):
@@ -184,7 +263,8 @@ def main():
         shutil.copy2(ROOT / "target/release/megawren", exe)
         for file in ["LICENSE", "THIRD_PARTY_NOTICES.md"]:
             shutil.copyfile(ROOT / file, root / file)
-        (root / "README.md").write_text("# Megawren\n\nRun `bin/megawren` to open the file browser. "
+        check_auditable(exe)
+        (root / "README.md").write_text("# Megawren\n\nRun `bin/megawren` to see the files in your MEGA account, right in this terminal. "
             "Enter opens a folder or file actions. Space marks items. Press ? for help.\n\n"
             "Run `bin/megawren --help` for commands and `bin/megawren status` for local storage paths.\n")
         notices(root / "licenses", metadata["packages"])
@@ -203,6 +283,7 @@ def main():
     with artifact.open("rb") as stream:
         checksum = hashlib.file_digest(stream, "sha256").hexdigest()
     (dist / (artifact.name + ".sha256")).write_text(f"{checksum}  {artifact.name}\n")
+    sbom(dist / f"{name}.cdx.json", version, host, metadata["packages"])
     print(artifact)
 
 

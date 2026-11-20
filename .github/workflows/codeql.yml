@@ -1,0 +1,36 @@
+name: codeql
+# Static analysis of Megawren's own code: Rust, the C++ bridge in native/,
+# the Python scripts, and these workflows. The MEGA SDK submodule is not
+# checked out, so its code is not analyzed. Alerts need write access to view.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "29 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, c-cpp, python, rust]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}

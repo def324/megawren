@@ -110,9 +110,11 @@ CXXFLAGS="-include $root/native/musl_clockwait.h" MAKEFLAGS=-k BUILD_JOBS=$jobs 
 ccache --show-stats | grep -E 'Hits|Misses' | head -2
 rustup-init -y --profile minimal --default-toolchain "${RUST_VERSION:-1.99.1}" --no-modify-path
 PATH="$CARGO_HOME/bin:$PATH"
+# Embeds the dependency list in the binary so it can be audited after release.
+cargo install --locked --version 0.7.7 cargo-auditable
 # build.rs links the C++ runtime statically, so cc must not add it dynamically.
 export CXXSTDLIB=
-"$root/scripts/cargo.sh" build --release --locked
+"$root/scripts/cargo.sh" auditable build --release --locked
 # The 64-byte stub would mean ICU data is missing from the binary.
 size=$(nm -S "$root/target/release/megawren" | awk -v s="${icu}_dat" '$4 == s {print $2}')
 [ "$((0x${size:-0}))" -gt 1000000 ] || { echo "ICU data is not embedded (${icu}_dat size 0x${size:-0})" >&2; exit 1; }

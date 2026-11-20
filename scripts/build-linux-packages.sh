@@ -51,7 +51,7 @@ contents:
 EOF
 for packager in deb rpm; do
     docker run --rm --user "$(id -u):$(id -g)" -v "$work:/work" -w /work \
-        goreleaser/nfpm:v2.48.0 pkg --config nfpm.yaml --packager "$packager" --target /work/
+        goreleaser/nfpm:v2.48.0@sha256:d57a1452e7a019896b355f7b1ec67262278f6c503631f652d4fce7aef9ac8df7 pkg --config nfpm.yaml --packager "$packager" --target /work/
 done
 cd "$work"
 for package in *.deb *.rpm; do
