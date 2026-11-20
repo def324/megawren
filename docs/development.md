@@ -41,7 +41,7 @@ A passphrase-protected login uses the original session vault format. A login sav
 
 ## Publishing a release
 
-Tag the tested commit with `v` and the version from `Cargo.toml`. Publish the two macOS archives, the two static Linux archives (`linux-musl`), and the `.deb` and `.rpm` packages from the static jobs, each with its adjacent `.sha256` file, from that commit’s successful CI run in GitHub Releases. The Ubuntu archive is a CI check and is not published. The tag’s CI run pushes the container image to `ghcr.io/def324/megawren` with the version and `latest` tags. GitHub creates new packages as private. After the first push, set the package to public under Package settings → Change visibility.
+Tag the tested commit with `v` and the version from `Cargo.toml`. Publish the two macOS archives, the two static Linux archives (`linux-musl`), and the `.deb` and `.rpm` packages from the static jobs, each with its adjacent `.sha256` file, from that commit’s successful CI run in GitHub Releases. The Ubuntu archive is a CI check and is not published. The tag’s CI run pushes the container image to `ghcr.io/def324/megawren` with the version and `latest` tags. The package is public and linked to this repository.
 
 `install.sh` always installs the latest release, so it needs no update for a release. CI tests it, the `.deb`, the `.rpm`, and the container image against each build.
 
