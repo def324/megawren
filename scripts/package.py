@@ -130,6 +130,14 @@ def linux_static(root):
         raise RuntimeError("The static Linux executable still loads shared libraries")
     (root / "RUNTIME.txt").write_text("Built on " + platform.freedesktop_os_release()["PRETTY_NAME"] +
         " with musl\nStatically linked. Needs no system libraries.\n")
+    # Notices for the C libraries inside the executable. SQLite is public domain.
+    licenses = root / "licenses"
+    for source in (ROOT / "docs/licenses/static-linux").glob("*.txt"):
+        shutil.copyfile(source, licenses / source.name)
+    deps = ROOT / "target/static-deps/src"
+    curl, = deps.glob("curl-*/COPYING")
+    shutil.copyfile(curl, licenses / "curl.txt")
+    shutil.copyfile(deps / "cryptopp/License.txt", licenses / "Crypto++.txt")
 
 
 def linux(root):
