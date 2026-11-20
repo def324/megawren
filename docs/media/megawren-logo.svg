@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 56 56" role="img" aria-labelledby="title desc">
+  <title id="title">Megawren</title>
+  <desc id="desc">A blue command prompt on a charcoal terminal. A small off-white pixel wren perches on the underscore cursor.</desc>
+
+  <rect x="1" y="4" width="54" height="48" rx="7" fill="#303b49"/>
+  <rect x="2" y="5" width="52" height="46" rx="6" fill="#0d1117"/>
+  <path fill="#303b49" d="M2 14h52v1H2z"/>
+  <path fill="#8b99a8" d="M7 9h3v2H7zm5 0h3v2h-3z"/>
+
+  <!-- The two parts of the shell prompt share a baseline. -->
+  <path fill="#58a6ff" d="m8 25 3-3 11 10-11 10-3-3 8-7zM26 38h20v4H26z"/>
+
+  <!-- Draw the bird on a coarse grid, like a custom terminal glyph. -->
+  <path fill="#e6edf3" d="
+    M25 22h3v3h3v3h3v-3h2v-3h6v2h2v2h4v2h-4v4h-2v2h-3v4h-2v-3h-5v-2h-3v-3h-2v-4h-2z"/>
+  <path fill="#0d1117" d="M40 24h2v2h-2z"/>
+</svg>

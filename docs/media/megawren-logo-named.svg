@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 56 56" role="img" aria-labelledby="title desc">
+  <title id="title">Megawren</title>
+  <desc id="desc">A blue command prompt on a charcoal terminal. A small off-white pixel wren perches on the underscore cursor.</desc>
+
+  <rect x="1" y="4" width="54" height="48" rx="7" fill="#303b49"/>
+  <rect x="2" y="5" width="52" height="46" rx="6" fill="#0d1117"/>
+  <path fill="#303b49" d="M2 16h52v1H2z"/>
+  <!-- Lowercase pixel lettering for the title bar. -->
+  <g fill="#b6c3d1" aria-label="megawren">
+    <path d="M7 8h2v1h-2zM10 8h1v1h-1zM7 9h1v1h-1zM9 9h1v1h-1zM11 9h1v1h-1zM7 10h1v1h-1zM9 10h1v1h-1zM11 10h1v1h-1zM7 11h1v1h-1zM9 11h1v1h-1zM11 11h1v1h-1zM7 12h1v1h-1zM9 12h1v1h-1zM11 12h1v1h-1z"/>
+    <path d="M14 8h2v1h-2zM13 9h1v1h-1zM16 9h1v1h-1zM13 10h4v1h-4zM13 11h1v1h-1zM14 12h3v1h-3z"/>
+    <path d="M19 8h3v1h-3zM18 9h1v1h-1zM21 9h1v1h-1zM18 10h1v1h-1zM21 10h1v1h-1zM19 11h3v1h-3zM21 12h1v1h-1zM18 13h3v1h-3z"/>
+    <path d="M24 8h2v1h-2zM26 9h1v1h-1zM24 10h3v1h-3zM23 11h1v1h-1zM26 11h1v1h-1zM24 12h3v1h-3z"/>
+    <path d="M28 8h1v1h-1zM32 8h1v1h-1zM28 9h1v1h-1zM32 9h1v1h-1zM28 10h1v1h-1zM30 10h1v1h-1zM32 10h1v1h-1zM28 11h1v1h-1zM30 11h1v1h-1zM32 11h1v1h-1zM29 12h1v1h-1zM31 12h1v1h-1z"/>
+    <path d="M34 8h1v1h-1zM36 8h2v1h-2zM34 9h2v1h-2zM34 10h1v1h-1zM34 11h1v1h-1zM34 12h1v1h-1z"/>
+    <path d="M40 8h2v1h-2zM39 9h1v1h-1zM42 9h1v1h-1zM39 10h4v1h-4zM39 11h1v1h-1zM40 12h3v1h-3z"/>
+    <path d="M44 8h3v1h-3zM44 9h1v1h-1zM47 9h1v1h-1zM44 10h1v1h-1zM47 10h1v1h-1zM44 11h1v1h-1zM47 11h1v1h-1zM44 12h1v1h-1zM47 12h1v1h-1z"/>
+  </g>
+
+  <!-- The two parts of the shell prompt share a baseline. -->
+  <path fill="#58a6ff" d="m8 25 3-3 11 10-11 10-3-3 8-7zM26 38h20v4H26z"/>
+
+  <!-- Draw the bird on a coarse grid, like a custom terminal glyph. -->
+  <path fill="#e6edf3" d="
+    M25 22h3v3h3v3h3v-3h2v-3h6v2h2v2h4v2h-4v4h-2v2h-3v4h-2v-3h-5v-2h-3v-3h-2v-4h-2z"/>
+  <path fill="#0d1117" d="M40 24h2v2h-2z"/>
+</svg>
