@@ -91,13 +91,38 @@ jobs:
             platform: linux/arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    env:
+      RUST_VERSION: 1.99.1
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      # Cache names put the runner before a fixed word, because restores match
+      # by prefix and "ubuntu-24.04-" would also match "ubuntu-24.04-arm-".
+      - name: Cache Crypto++ and curl
+        uses: actions/cache@v4
+        with:
+          path: target/static-deps/prefix
+          key: static-${{ matrix.runner }}-deps-${{ hashFiles('scripts/build-static-linux.sh') }}
+      - name: Cache SDK objects
+        uses: actions/cache@v4
+        with:
+          path: target/static-cache/ccache
+          key: static-${{ matrix.runner }}-ccache-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: static-${{ matrix.runner }}-ccache-
+      - name: Cache Rust toolchain and dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            target/static-cache/cargo
+            target/static-cache/rustup
+            target/release
+            target/debug
+          key: static-${{ matrix.runner }}-cargo-${{ env.RUST_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: static-${{ matrix.runner }}-cargo-${{ env.RUST_VERSION }}-
       - name: Build in Alpine Linux
         run: >-
-          docker run --rm --platform ${{ matrix.platform }} -e RUST_VERSION=1.99.1
+          docker run --rm --platform ${{ matrix.platform }} -e RUST_VERSION
           -v "$PWD:/work/megawren" -w /work/megawren alpine:3.24 sh scripts/build-static-linux.sh
       - name: Run unpacked client on the host
         run: |

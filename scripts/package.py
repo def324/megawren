@@ -134,10 +134,11 @@ def linux_static(root):
     licenses = root / "licenses"
     for source in (ROOT / "docs/licenses/static-linux").glob("*.txt"):
         shutil.copyfile(source, licenses / source.name)
-    deps = ROOT / "target/static-deps/src"
-    curl, = deps.glob("curl-*/COPYING")
-    shutil.copyfile(curl, licenses / "curl.txt")
-    shutil.copyfile(deps / "cryptopp/License.txt", licenses / "Crypto++.txt")
+    for source in (ROOT / "target/static-deps/prefix/share/licenses").glob("*.txt"):
+        shutil.copyfile(source, licenses / source.name)
+    for name in ["curl.txt", "Crypto++.txt"]:
+        if not (licenses / name).is_file():
+            raise RuntimeError(f"Missing {name} for the static Linux archive")
 
 
 def linux(root):

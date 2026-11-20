@@ -12,9 +12,13 @@ deps="$root/target/static-deps"
 prefix="$deps/prefix"
 jobs=$(nproc)
 map="-ffile-prefix-map=$root=/src/megawren -ffile-prefix-map=$HOME=/build"
+# CI caches these between runs. See the static-linux job in ci.yml.
+cache="$root/target/static-cache"
+export CCACHE_DIR="$cache/ccache" CARGO_HOME="$cache/cargo" RUSTUP_HOME="$cache/rustup"
+export CARGO_INCREMENTAL=0
 
 apk add --no-cache bash build-base cmake samurai pkgconf perl python3 git \
-    linux-headers rustup unzip xz \
+    linux-headers rustup unzip xz ccache \
     openssl-dev openssl-libs-static sqlite-dev sqlite-static icu icu-dev icu-static icu-data-en \
     libsodium-dev libsodium-static zlib-dev zlib-static
 # The checkout belongs to the host user. The SDK script reads its submodule.
@@ -41,6 +45,8 @@ if [ ! -f "$prefix/lib/libcryptopp.a" ]; then
     mkdir -p "$prefix/include/cryptopp"
     cp "$deps/src/cryptopp"/*.h "$prefix/include/cryptopp/"
     cp "$deps/src/cryptopp/libcryptopp.a" "$prefix/lib/"
+    mkdir -p "$prefix/share/licenses"
+    cp "$deps/src/cryptopp/License.txt" "$prefix/share/licenses/Crypto++.txt"
 fi
 cat > "$prefix/lib/pkgconfig/libcrypto++.pc" <<EOF
 prefix=$prefix
@@ -72,6 +78,8 @@ if [ ! -f "$prefix/lib/libcurl.a" ]; then
         -DCURL_CA_BUNDLE=none -DCURL_CA_PATH=none
     cmake --build "$deps/build-curl" --parallel "$jobs"
     cmake --install "$deps/build-curl"
+    mkdir -p "$prefix/share/licenses"
+    cp "$deps/src/curl-8.23.0/COPYING" "$prefix/share/licenses/curl.txt"
 fi
 
 # Alpine's libicudata.a is a stub that loads /usr/share/icu at run time, which a
@@ -92,13 +100,16 @@ export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
 # native/musl_clockwait.h relies on this libstdc++ switch. Fail loudly if it moves.
 grep -q '_GLIBCXX_USE_PTHREAD_COND_CLOCKWAIT' /usr/include/c++/*/bits/std_mutex.h
 # -k reports every file that fails to compile, not only the first.
+ccache --max-size=500M --zero-stats >/dev/null
 CXXFLAGS="-include $root/native/musl_clockwait.h" MAKEFLAGS=-k BUILD_JOBS=$jobs \
+    CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
     "$root/scripts/build-sdk.sh" \
     -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DCMAKE_PROJECT_INCLUDE="$root/scripts/static-linux-sdk.cmake"
 
+ccache --show-stats | grep -E 'Hits|Misses' | head -2
 rustup-init -y --profile minimal --default-toolchain "${RUST_VERSION:-1.99.1}" --no-modify-path
-PATH="$HOME/.cargo/bin:$PATH"
+PATH="$CARGO_HOME/bin:$PATH"
 # build.rs links the C++ runtime statically, so cc must not add it dynamically.
 export CXXSTDLIB=
 "$root/scripts/cargo.sh" build --release --locked
