@@ -125,18 +125,18 @@ jobs:
       # Cache names put the runner before a fixed word, because restores match
       # by prefix and "ubuntu-24.04-" would also match "ubuntu-24.04-arm-".
       - name: Cache Crypto++ and curl
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/static-deps/prefix
           key: static-${{ matrix.runner }}-deps-${{ hashFiles('scripts/build-static-linux.sh') }}
       - name: Cache SDK objects
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/static-cache/ccache
           key: static-${{ matrix.runner }}-ccache-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: static-${{ matrix.runner }}-ccache-
       - name: Cache Rust toolchain and dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             target/static-cache/cargo
