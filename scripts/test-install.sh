@@ -32,7 +32,7 @@ if [ -e "$bin" ] || [ -e "$data" ]; then fail "uninstall left files"; fi
 [ -f "$HOME/.megawren/cache.enc" ] || fail "uninstall removed ~/.megawren without --purge"
 
 step "reinstall after uninstall"
-sh -x "$root/install.sh" --archive "$archive" || fail "reinstall exited with $?"
+sh "$root/install.sh" --archive "$archive" >/dev/null || fail "reinstall exited with $?"
 
 step "purge"
 touch "$HOME/.megawren/session.enc"

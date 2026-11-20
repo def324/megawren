@@ -124,7 +124,8 @@ if $purge; then
         fi
         signed_out=false
         # Signing out may ask for the local passphrase, so it needs a terminal.
-        if [ -n "$exe" ] && { : </dev/tty; } 2>/dev/null; then
+        # The subshell matters: a failed redirection on ":" exits a POSIX shell.
+        if [ -n "$exe" ] && (: </dev/tty) 2>/dev/null; then
             echo "Signing out of MEGA..."
             if "$exe" logout </dev/tty; then signed_out=true; fi
         fi
