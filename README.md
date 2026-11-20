@@ -22,7 +22,7 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 brew install def324/tap/megawren
 ```
 
-Prebuilt archives for Apple Silicon, Intel Macs and x86-64 Linux are available on the [releases page](https://github.com/def324/megawren/releases/latest). Extract the archive and keep `bin/` and `lib/` together. The Linux archive lists its required system libraries in `RUNTIME.txt`.
+Prebuilt archives for Apple Silicon and Intel Macs, and for x86-64 and ARM64 Linux, are available on the [releases page](https://github.com/def324/megawren/releases/latest). The Linux archives are statically linked and need no system libraries, so they also run on Linux-based NAS systems. Extract the archive and run `bin/megawren`. On macOS, keep `bin/` and `lib/` together.
 
 ## Open your drive
 

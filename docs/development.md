@@ -37,9 +37,10 @@ A passphrase-protected login uses the original session vault format. A login sav
 - To inspect a layout, run `./scripts/cargo.sh test --locked tui::preview::export_visual_fixtures -- --ignored`. Open the SVGs in `target/tui-preview/`.
 - To update the README animation, edit the [scripted tour](../src/tui/preview/demo.rs) and run `./scripts/demo.py` with uv and asciinema agg 1.9 or newer installed. The script renders the widgets with fictional files and typesets the captions below the terminal.
 - To package a release build for the current machine, run `python3 scripts/package.py` after `./scripts/cargo.sh build --release --locked`. Packaging needs Python 3.11 or newer and, on Linux, `patchelf`. The archive and its SHA-256 checksum go in `target/dist/`. Build macOS archives on Sequoia (15). The packager checks the minimum OS of each bundled library. CI builds and runs each archive on its target platform.
+- The Linux release archives are statically linked against musl. `scripts/build-static-linux.sh` builds one inside an Alpine Linux 3.24 container for the container's CPU: `docker run --rm -v "$PWD:/work/megawren" -w /work/megawren alpine:3.24 sh scripts/build-static-linux.sh`. It builds Crypto++ and a minimal curl from checksum-verified sources, embeds ICU's English data, and runs the tests before packaging. musl lacks `pthread_cond_clockwait`, so [native/musl_clockwait.h](../native/musl_clockwait.h) supplies it to keep the SDK's untimed waits from spinning.
 
 ## Publishing a release
 
-Tag the tested commit with `v` and the version from `Cargo.toml`. Publish the three archives and their adjacent `.sha256` files from that commit’s successful CI run in GitHub Releases.
+Tag the tested commit with `v` and the version from `Cargo.toml`. Publish the two macOS archives and the two static Linux archives (`linux-musl`), with their adjacent `.sha256` files, from that commit’s successful CI run in GitHub Releases. The Ubuntu archive is a CI check and is not published.
 
 Update the tagged source URL and SHA-256 in the [Homebrew formula](https://github.com/def324/homebrew-tap/blob/main/Formula/megawren.rb). When the SDK changes, update the formula’s SDK resource to the commit reported by `git rev-parse HEAD:vendor/mega` and verify its archive checksum. Open a tap pull request so Homebrew tests the installation before the update ships.
