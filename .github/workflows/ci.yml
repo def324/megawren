@@ -83,7 +83,7 @@ jobs:
           bin/megawren status
       - name: Lint shell scripts
         if: runner.os == 'Linux'
-        run: shellcheck -s sh install.sh scripts/test-install.sh scripts/build-linux-packages.sh
+        run: shellcheck -s sh install.sh scripts/test-install.sh scripts/build-linux-packages.sh scripts/scan-sboms.sh
       # install.sh installs the static archives on Linux, so it is tested there.
       - name: Test install.sh
         if: runner.os == 'macOS'
@@ -251,18 +251,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: megawren-*
           path: sboms
           merge-multiple: true
       - name: Scan with Grype
-        run: |
-          status=0
-          for sbom in sboms/*.cdx.json; do
-            echo "== $(basename "$sbom")"
-            docker run --rm -v "$PWD/sboms:/sboms:ro" -v grype-db:/root/.cache/grype \
-              anchore/grype:v0.121.2@sha256:6a36234da13f9faa327306ac0b3dab3405cfa2b4eb20c8f904125a8707863913 \
-              "sbom:/sboms/$(basename "$sbom")" --only-fixed --fail-on high || status=1
-          done
-          exit $status
+        run: sh scripts/scan-sboms.sh sboms
