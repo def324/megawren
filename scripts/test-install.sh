@@ -12,26 +12,34 @@ trap 'rm -rf "$HOME"' EXIT
 bin="$HOME/.local/bin/megawren"
 data="$HOME/.local/share/megawren"
 fail() { echo "test-install: $*" >&2; exit 1; }
+step() { echo "== $*"; }
 
-sh "$root/install.sh" --archive "$archive"
+step "install"
+sh "$root/install.sh" --archive "$archive" || fail "install exited with $?"
 "$bin" --version
 [ -x "$data/uninstall.sh" ] || fail "no uninstaller"
 grep -q '^version=' "$data/install-receipt" || fail "no receipt"
 
-sh "$root/install.sh" --archive "$archive" >/dev/null   # upgrade in place
+step "upgrade in place"
+sh "$root/install.sh" --archive "$archive" >/dev/null || fail "upgrade exited with $?"
 "$bin" --version >/dev/null
 
+step "uninstall keeps ~/.megawren"
 mkdir -p "$HOME/.megawren"
 touch "$HOME/.megawren/cache.enc"
-"$data/uninstall.sh"
-[ ! -e "$bin" ] && [ ! -e "$data" ] || fail "uninstall left files"
+"$data/uninstall.sh" || fail "uninstall.sh exited with $?"
+if [ -e "$bin" ] || [ -e "$data" ]; then fail "uninstall left files"; fi
 [ -f "$HOME/.megawren/cache.enc" ] || fail "uninstall removed ~/.megawren without --purge"
 
-sh "$root/install.sh" --archive "$archive" >/dev/null
-touch "$HOME/.megawren/session.enc"
-sh "$root/install.sh" --uninstall --purge </dev/null
-[ ! -e "$bin" ] && [ ! -e "$data" ] && [ ! -e "$HOME/.megawren" ] || fail "purge left files"
+step "reinstall after uninstall"
+sh -x "$root/install.sh" --archive "$archive" || fail "reinstall exited with $?"
 
+step "purge"
+touch "$HOME/.megawren/session.enc"
+sh "$root/install.sh" --uninstall --purge </dev/null || fail "purge exited with $?"
+if [ -e "$bin" ] || [ -e "$data" ] || [ -e "$HOME/.megawren" ]; then fail "purge left files"; fi
+
+step "refuse to replace a foreign file"
 mkdir -p "$HOME/.local/bin"
 echo foreign >"$bin"
 if sh "$root/install.sh" --archive "$archive" 2>/dev/null; then fail "overwrote a foreign file"; fi
