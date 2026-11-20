@@ -4,7 +4,7 @@
 #
 #   sh scripts/scan-sboms.sh DIR
 #
-# It first scans .github/grype-canary.cdx.json, which lists known-vulnerable
+# It first scans .github/grype-canary.json, which lists known-vulnerable
 # versions of an Alpine package, a CPE-identified C library, and a crate. A
 # clean result counts only if all three of those are caught.
 set -eu
@@ -15,7 +15,7 @@ grype() {
         anchore/grype:v0.121.2@sha256:6a36234da13f9faa327306ac0b3dab3405cfa2b4eb20c8f904125a8707863913 "$@"
 }
 
-found=$(grype sbom:/fixtures/grype-canary.cdx.json -o json | jq -r '[.matches[].artifact.name] | unique | join(" ")')
+found=$(grype sbom:/fixtures/grype-canary.json -o json | jq -r '[.matches[].artifact.name] | unique | join(" ")')
 for name in openssl-libs-static curl smallvec; do
     case " $found " in
         *" $name "*) ;;
