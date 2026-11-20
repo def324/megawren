@@ -90,6 +90,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             platform: linux/arm64
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -97,6 +98,8 @@ jobs:
       - name: Build in Alpine Linux
         run: >-
           docker run --rm --platform ${{ matrix.platform }} -e RUST_VERSION=1.99.1
+          --cap-add=SYS_PTRACE
+          -e MEGAWREN_DIAGNOSE_HANG=backend::tests::native_initialization_without_app_key_and_teardown_leave_no_run_directory
           -v "$PWD:/work/megawren" -w /work/megawren alpine:3.24 sh scripts/build-static-linux.sh
       - name: Run unpacked client on the host
         run: |

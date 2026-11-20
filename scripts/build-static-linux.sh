@@ -85,5 +85,17 @@ PATH="$HOME/.cargo/bin:$PATH"
 # build.rs links the C++ runtime statically, so cc must not add it dynamically.
 export CXXSTDLIB=
 "$root/scripts/cargo.sh" build --release --locked
-"$root/scripts/cargo.sh" test --locked
+if [ -n "${MEGAWREN_DIAGNOSE_HANG:-}" ]; then
+    # Temporary: dump every thread of a test that hangs on musl.
+    apk add --no-cache gdb
+    bin=$("$root/scripts/cargo.sh" test --locked --no-run 2>&1 | sed -n 's/.*Executable unittests src\/main.rs (\(.*\))/\1/p')
+    "$root/$bin" --exact "$MEGAWREN_DIAGNOSE_HANG" --nocapture &
+    pid=$!
+    sleep 30
+    if kill -0 "$pid" 2>/dev/null; then
+        gdb -p "$pid" -batch -ex 'info threads' -ex 'thread apply all bt 25' 2>&1 | grep -v -E '^\[New LWP|^warning:' || true
+        kill -9 "$pid"
+    fi
+fi
+timeout 900 "$root/scripts/cargo.sh" test --locked
 python3 "$root/scripts/package.py"
