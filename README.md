@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/media/megawren-logo-named.png" width="144" height="144" alt="Megawren terminal logo">
+</p>
+
 # Megawren - MEGA terminal client (tui) for macOS and Linux
 
 Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It uses the official MEGA SDK and runs without a background service.
