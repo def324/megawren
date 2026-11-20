@@ -149,12 +149,12 @@ jobs:
           sudo apt-get install -y ./target/dist/megawren_*.deb
           megawren --version
           sudo apt-get remove -y megawren
-          if command -v megawren; then exit 1; fi
+          if dpkg -s megawren >/dev/null 2>&1 || [ -e /usr/bin/megawren ]; then exit 1; fi
       - name: Install and remove the .rpm on Fedora
         run: >-
           docker run --rm -v "$PWD/target/dist:/packages:ro" fedora:44 sh -ec
           'dnf install -y /packages/megawren-*.rpm; megawren --version; megawren status;
-          dnf remove -y megawren; if command -v megawren; then exit 1; fi'
+          dnf remove -y megawren; if rpm -q megawren || [ -e /usr/bin/megawren ]; then exit 1; fi'
       - uses: actions/upload-artifact@v4
         with:
           name: megawren-static-${{ matrix.runner }}
