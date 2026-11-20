@@ -15,7 +15,7 @@ map="-ffile-prefix-map=$root=/src/megawren -ffile-prefix-map=$HOME=/build"
 
 apk add --no-cache bash build-base cmake samurai pkgconf perl python3 git \
     linux-headers rustup unzip xz \
-    openssl-dev openssl-libs-static sqlite-dev sqlite-static icu-dev icu-static \
+    openssl-dev openssl-libs-static sqlite-dev sqlite-static icu icu-dev icu-static icu-data-en \
     libsodium-dev libsodium-static zlib-dev zlib-static
 # The checkout belongs to the host user. The SDK script reads its submodule.
 git config --global --add safe.directory '*'
@@ -74,6 +74,18 @@ if [ ! -f "$prefix/lib/libcurl.a" ]; then
     cmake --install "$deps/build-curl"
 fi
 
+# Alpine's libicudata.a is a stub that loads /usr/share/icu at run time, which a
+# NAS does not have. genccode turns the English data subset into the real
+# library, and the prefix comes before /usr/lib in the link. The SDK only uses
+# an English collator and case mapping.
+dat=$(ls /usr/share/icu/*/icudt*l.dat)
+icu=$(basename "$dat" l.dat)
+rm -rf "$deps/icudata" && mkdir "$deps/icudata"
+genccode -o -e "$icu" -d "$deps/icudata" "$dat"
+rm -f "$prefix/lib/libicudata.a"
+ar rcs "$prefix/lib/libicudata.a" "$deps/icudata"/*.o
+echo "Embedding $(basename "$dat") ($(du -h "$dat" | cut -f1)) as ${icu}_dat"
+
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
 # native/musl_clockwait.h relies on this libstdc++ switch. Fail loudly if it moves.
 grep -q '_GLIBCXX_USE_PTHREAD_COND_CLOCKWAIT' /usr/include/c++/*/bits/std_mutex.h
@@ -88,17 +100,10 @@ PATH="$HOME/.cargo/bin:$PATH"
 # build.rs links the C++ runtime statically, so cc must not add it dynamically.
 export CXXSTDLIB=
 "$root/scripts/cargo.sh" build --release --locked
-if [ -n "${MEGAWREN_DIAGNOSE_HANG:-}" ]; then
-    # Temporary: dump every thread of a test that hangs on musl.
-    apk add --no-cache gdb
-    bin=$("$root/scripts/cargo.sh" test --locked --no-run 2>&1 | sed -n 's/.*Executable unittests src\/main.rs (\(.*\))/\1/p')
-    "$root/$bin" --exact "$MEGAWREN_DIAGNOSE_HANG" --nocapture &
-    pid=$!
-    sleep 30
-    if kill -0 "$pid" 2>/dev/null; then
-        gdb -p "$pid" -batch -ex 'info threads' -ex 'thread apply all bt 25' 2>&1 | grep -v -E '^\[New LWP|^warning:' || true
-        kill -9 "$pid"
-    fi
-fi
+# The 64-byte stub would mean ICU data is missing from the binary.
+size=$(nm -S "$root/target/release/megawren" | awk -v s="${icu}_dat" '$4 == s {print $2}')
+[ "$((0x${size:-0}))" -gt 1000000 ] || { echo "ICU data is not embedded (${icu}_dat size 0x${size:-0})" >&2; exit 1; }
+# Tests must not find ICU data outside the binary.
+rm -rf /usr/share/icu
 timeout 900 "$root/scripts/cargo.sh" test --locked
 python3 "$root/scripts/package.py"
