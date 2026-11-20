@@ -32,6 +32,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt, clippy
+      # rust-cache keys on every installed toolchain, and runner images differ
+      # in which extra ones they ship. Keep only the pinned toolchain.
+      - run: |
+          active=$(rustup show active-toolchain | cut -d' ' -f1)
+          rustup toolchain list --quiet | grep -v -x "$active" | xargs -r -n1 rustup toolchain uninstall
+          rustup toolchain list
       # The runner image already has a newer CMake on PATH. Ubuntu's package
       # was most of this download, so it is installed only if missing.
       - if: runner.os == 'Linux'
