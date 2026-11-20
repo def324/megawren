@@ -18,11 +18,38 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 
 ## Install
 
-```sh
-brew install def324/tap/megawren
-```
+| Method | Command |
+| --- | --- |
+| Homebrew, macOS or Linux | `brew install def324/tap/megawren` |
+| Install script, macOS or Linux (including NAS) | `curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh \| sh` |
+| Debian, Ubuntu, Raspberry Pi OS | `sudo apt install ./megawren_*.deb` after downloading the `.deb` |
+| Fedora, RHEL, openSUSE | `sudo dnf install ./megawren-*.rpm` after downloading the `.rpm` |
+| Docker or Podman | `docker run -it --rm -v megawren:/data ghcr.io/def324/megawren` |
 
-Prebuilt archives for Apple Silicon and Intel Macs, and for x86-64 and ARM64 Linux, are available on the [releases page](https://github.com/def324/megawren/releases/latest). The Linux archives are statically linked and need no system libraries, so they also run on Linux-based NAS systems. Extract the archive and run `bin/megawren`. On macOS, keep `bin/` and `lib/` together.
+Packages and archives are on the [releases page](https://github.com/def324/megawren/releases/latest). The Linux builds are statically linked and need no system libraries, so they run on any x86-64 or ARM64 Linux, including NAS systems.
+
+**The install script** puts Megawren in `~/.local/bin` without `sudo` and checks the download's SHA-256 checksum. Run it again to upgrade. Pass `--version X.Y.Z` for a specific release or `--prefix DIR` to install elsewhere. Run it with `--help` for all options.
+
+**The container** keeps your saved login and file index in the `megawren` volume. Leave out `-it` to run commands from a script, for example `docker run --rm -v megawren:/data ghcr.io/def324/megawren ls /Reports`. To download into a folder on the host, mount it with `-v "$PWD:/downloads"` and pass `/downloads` as the destination.
+
+**An archive** works on its own. Extract it and run `bin/megawren`. On macOS, keep `bin/` and `lib/` together.
+
+### Uninstall
+
+| Installed with | Remove the program |
+| --- | --- |
+| Install script | `~/.local/share/megawren/uninstall.sh` |
+| Homebrew | `brew uninstall megawren` |
+| `.deb` | `sudo apt remove megawren` |
+| `.rpm` | `sudo dnf remove megawren` |
+| Docker or Podman | `docker image rm ghcr.io/def324/megawren` |
+
+Removing the program keeps your saved login and file index in `~/.megawren`, so a reinstall picks up where you left off. To remove those too:
+
+- With the install script, run `~/.local/share/megawren/uninstall.sh --purge`. It signs out of MEGA, deletes `~/.megawren`, and then removes the program.
+- Otherwise, run `megawren logout` first so the saved session ends on MEGA's servers, then delete `~/.megawren`. For the container, run `docker run -it --rm -v megawren:/data ghcr.io/def324/megawren logout`, then `docker volume rm megawren`.
+
+If the uninstaller is gone, the install script can do the same: `curl -fsSL https://raw.githubusercontent.com/def324/megawren/main/install.sh | sh -s -- --uninstall --purge`. Leave out `--purge` to keep `~/.megawren`. If you installed with `--prefix`, pass the same prefix.
 
 ## Open your drive
 
