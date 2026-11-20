@@ -175,6 +175,7 @@ jobs:
           path: target/static-artifacts
       - name: Unpack the static binaries
         run: |
+          mkdir -p target/image
           for arch in amd64 arm64; do
             case $arch in amd64) cpu=x86_64 ;; arm64) cpu=aarch64 ;; esac
             root=target/image/$arch
