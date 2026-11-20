@@ -1,4 +1,7 @@
-# Weekly update pull requests, grouped so each ecosystem opens at most one.
+# Weekly update pull requests. Minor and patch updates are grouped into one PR
+# per ecosystem. Each major update gets its own PR, because those can change
+# behavior and, for the crypto crates, the saved-login format. Versions must be
+# at least 14 days old, which gives a compromised release time to be caught.
 # The MEGA SDK submodule is updated by hand, since a new SDK needs review.
 version: 2
 updates:
@@ -6,13 +9,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
-      rust-dependencies:
-        patterns: ["*"]
+      rust-minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
-      github-actions:
-        patterns: ["*"]
+      actions-minor-and-patch:
+        update-types: [minor, patch]
