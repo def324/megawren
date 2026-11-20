@@ -14,7 +14,7 @@ clap = { version = "4", features = ["derive"] }
 ctrlc = { version = "3", features = ["termination"] }
 cxx = "1"
 dirs = "6"
-getrandom = "0.3"
+getrandom = "0.4"
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "unstable-rendered-line-info"] }
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 ratatui-image = { version = "11.1", default-features = false }
