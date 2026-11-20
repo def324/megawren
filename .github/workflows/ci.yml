@@ -159,3 +159,47 @@ jobs:
         with:
           name: megawren-static-${{ matrix.runner }}
           path: target/dist/
+  # Multi-arch image around the static binaries. Only version tags push it.
+  container:
+    needs: static-linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: megawren-static-*
+          path: target/static-artifacts
+      - name: Unpack the static binaries
+        run: |
+          for arch in amd64 arm64; do
+            case $arch in amd64) cpu=x86_64 ;; arm64) cpu=aarch64 ;; esac
+            root=target/image/$arch
+            archive=$(ls target/static-artifacts/*/megawren-*-"$cpu"-unknown-linux-musl.tar.gz)
+            tar -xzf "$archive" -C target/image
+            unpacked=target/image/$(basename "$archive" .tar.gz)
+            mkdir -p "$root/usr/bin" "$root/usr/share/doc/megawren" "$root/data" "$root/tmp"
+            chmod 1777 "$root/tmp"
+            mv "$unpacked/bin/megawren" "$root/usr/bin/"
+            mv "$unpacked/LICENSE" "$unpacked/THIRD_PARTY_NOTICES.md" "$unpacked/licenses" "$root/usr/share/doc/megawren/"
+            rm -rf "$unpacked"
+          done
+      - name: Build and test the image
+        run: |
+          docker buildx create --use
+          docker buildx build --platform linux/amd64 --load -t megawren:test -f packaging/Dockerfile target/image
+          docker run --rm megawren:test --version
+          docker run --rm -v megawren-test:/data megawren:test status
+          docker buildx build --platform linux/amd64,linux/arm64 -f packaging/Dockerfile target/image
+      - name: Push to ghcr.io
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx build --platform linux/amd64,linux/arm64 --push \
+            -t "ghcr.io/def324/megawren:${GITHUB_REF_NAME#v}" -t ghcr.io/def324/megawren:latest \
+            -f packaging/Dockerfile target/image
