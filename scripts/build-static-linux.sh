@@ -75,7 +75,10 @@ if [ ! -f "$prefix/lib/libcurl.a" ]; then
 fi
 
 export PKG_CONFIG_PATH="$prefix/lib/pkgconfig"
-BUILD_JOBS=$jobs "$root/scripts/build-sdk.sh" -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+# -k reports every file that fails to compile, not only the first.
+MAKEFLAGS=-k BUILD_JOBS=$jobs "$root/scripts/build-sdk.sh" \
+    -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DCMAKE_PROJECT_INCLUDE="$root/scripts/static-linux-sdk.cmake"
 
 rustup-init -y --profile minimal --default-toolchain "${RUST_VERSION:-1.99.1}" --no-modify-path
 PATH="$HOME/.cargo/bin:$PATH"
