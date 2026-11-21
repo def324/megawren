@@ -1,6 +1,6 @@
 use anyhow::{Result, bail, ensure};
 use argon2::{Algorithm, Argon2, Params, Version};
-use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce, aead::AeadInPlace};
+use chacha20poly1305::{KeyInit, Tag, XChaCha20Poly1305, XNonce, aead::AeadInOut};
 use zeroize::Zeroizing;
 const MAGIC: &[u8; 8] = b"MGWSESS\0";
 const HEADER: usize = 68;
@@ -51,8 +51,9 @@ pub fn seal(password: &[u8], session: &[u8]) -> Result<Vec<u8>> {
     let key = derive(password, &h)?;
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref()).unwrap();
     let mut payload = Zeroizing::new(session.to_vec());
+    let nonce = XNonce::try_from(&h[40..64]).expect("the header holds a 24-byte nonce");
     let tag = cipher
-        .encrypt_in_place_detached(XNonce::from_slice(&h[40..64]), &aad(&h), &mut payload)
+        .encrypt_inout_detached(&nonce, &aad(&h), payload.as_mut_slice().into())
         .map_err(|_| anyhow::anyhow!("Vault encryption failed"))?;
     h.extend_from_slice(&payload);
     h.extend_from_slice(&tag);
@@ -77,12 +78,14 @@ pub fn open(password: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
     let key = derive(password, &data[..HEADER])?;
     let cipher = XChaCha20Poly1305::new_from_slice(key.as_ref()).unwrap();
     let mut plain = Zeroizing::new(data[HEADER..data.len() - 16].to_vec());
+    let nonce = XNonce::try_from(&data[40..64]).expect("the header holds a 24-byte nonce");
+    let tag = Tag::try_from(&data[data.len() - 16..]).expect("the vault ends with a 16-byte tag");
     if cipher
-        .decrypt_in_place_detached(
-            XNonce::from_slice(&data[40..64]),
+        .decrypt_inout_detached(
+            &nonce,
             &aad(&data[..HEADER]),
-            &mut plain,
-            chacha20poly1305::Tag::from_slice(&data[data.len() - 16..]),
+            plain.as_mut_slice().into(),
+            &tag,
         )
         .is_err()
     {
@@ -93,6 +96,22 @@ pub fn open(password: &[u8], data: &[u8]) -> Result<Zeroizing<Vec<u8>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const FIXTURE_SESSION: &[u8] = b"megawren vault fixture session, no real account";
+    #[test]
+    fn opens_saved_logins_written_by_earlier_releases() {
+        // Written by Megawren 0.2 with argon2 0.5.3 and chacha20poly1305 0.10.1.
+        // Dependency upgrades must keep opening existing saved logins.
+        let locked = include_bytes!("../tests/fixtures/vault-locked-0.2.bin");
+        assert!(!opens_automatically(locked));
+        assert_eq!(
+            &*open(b"correct horse battery staple", locked).unwrap(),
+            FIXTURE_SESSION
+        );
+        assert!(open(b"correct horse battery stapler", locked).is_err());
+        let automatic = include_bytes!("../tests/fixtures/vault-automatic-0.2.bin");
+        assert!(opens_automatically(automatic));
+        assert_eq!(&*open(b"", automatic).unwrap(), FIXTURE_SESSION);
+    }
     #[test]
     fn a_short_passphrase_still_locks_the_session() {
         let data = seal(b"x", b"session bytes").unwrap();
