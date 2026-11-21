@@ -45,7 +45,7 @@ Tag the tested commit with `v` and the version from `Cargo.toml`. Publish the tw
 
 CI attests every release file on `main` and tag runs, and the tag run attests the container image, so a release needs no extra signing step. Release builds use `cargo auditable`, and `scripts/package.py` fails in CI if a binary lacks its embedded dependency list.
 
-`security.yml` runs `cargo deny` (see `deny.toml`) when dependencies change and every Monday, and rescans the latest release's SBOMs with Grype. A failed scheduled run emails the maintainer. `scorecard.yml` and `codeql.yml` report only to code scanning alerts, which need write access to view.
+`security.yml` runs `cargo deny` (see `deny.toml`) when dependencies change and every day, and rescans the latest release's SBOMs with Grype. Dependabot's 14-day cooldown applies only to version updates; its security updates open at once. A failed scheduled run emails the maintainer. `scorecard.yml` and `codeql.yml` report only to code scanning alerts, which need write access to view.
 
 `install.sh` always installs the latest release, so it needs no update for a release. CI tests it, the `.deb`, the `.rpm`, and the container image against each build.
 

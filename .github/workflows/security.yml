@@ -1,6 +1,8 @@
 name: security
-# Looks for newly disclosed vulnerabilities every Monday, even without new
-# commits. A failed scheduled run emails the maintainer who set the schedule.
+# Looks for newly disclosed vulnerabilities every day, even without new
+# commits. Dependabot doesn't track the C libraries in the static builds, so
+# this is how a new OpenSSL or curl advisory gets noticed. A failed scheduled
+# run emails the maintainer who set the schedule.
 on:
   push:
     paths:
@@ -15,7 +17,7 @@ on:
       - deny.toml
       - .github/workflows/security.yml
   schedule:
-    - cron: "17 6 * * 1"
+    - cron: "17 6 * * *"
   workflow_dispatch:
 permissions:
   contents: read
