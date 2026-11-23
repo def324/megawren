@@ -189,6 +189,15 @@ jobs:
           # The SDK is not instrumented, so container-overflow reports would be false alarms.
           ASAN_OPTIONS: detect_leaks=0:detect_container_overflow=0
         run: timeout 1800 ./scripts/cargo.sh +"$NIGHTLY" test --locked --target x86_64-unknown-linux-gnu
+      # A passing run only counts if the bridge really carries the sanitizer checks.
+      - name: Confirm the C++ bridge is instrumented
+        run: |
+          bridge=$(ls target/x86_64-unknown-linux-gnu/debug/build/megawren-*/out/libmegawren-bridge.a | head -n 1)
+          if ! nm "$bridge" | grep -q '__asan_report'; then
+            echo "::error::The C++ bridge was built without AddressSanitizer."
+            exit 1
+          fi
+          echo "The C++ bridge ($bridge) calls AddressSanitizer checks."
   # One statically linked binary per CPU runs on any Linux, including NAS systems.
   static-linux:
     strategy:

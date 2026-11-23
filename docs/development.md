@@ -16,6 +16,10 @@ The fuzz targets in `fuzz/` cover code that handles untrusted input. `display` c
 
 `fuzz.yml` runs each target for three minutes when that code changes and every night, keeping the corpus between runs. To run one locally, install `cargo-fuzz` with the nightly toolchain pinned in that workflow, then run `cargo +nightly-2026-11-05 fuzz run display`.
 
+## Coverage and memory safety
+
+The `coverage` job runs the test suite under `cargo llvm-cov` and shows line coverage on the run page, with an HTML report attached. Test-only files are left out of the figure. The `asan` job runs the tests with AddressSanitizer in both the Rust code and the C++ bridge in `native/`, then checks that the bridge really was instrumented. Leak and container-overflow detection are off, because the MEGA SDK itself is not instrumented.
+
 ## Where to make a change
 
 | Task | Start here |
