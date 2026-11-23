@@ -10,6 +10,12 @@ cargo fmt --check
 
 The default suite runs without a MEGA account. To exercise a real upload and download, use the [manual transfer test](manual-testing.md).
 
+## Fuzzing
+
+The fuzz targets in `fuzz/` cover code that handles untrusted input. `display` checks that text shown in the terminal never carries controls or invisible direction changes, `listing_json` checks that `ls --json` stays terminal-safe yet round-trips every file name, and `vault_open` checks that a damaged saved-login file fails cleanly. They compile [src/text.rs](../src/text.rs) and [src/vault.rs](../src/vault.rs) directly, so they build without the MEGA SDK. Keep both files free of references to the rest of the crate.
+
+`fuzz.yml` runs each target for three minutes when that code changes and every night, keeping the corpus between runs. To run one locally, install `cargo-fuzz` with the nightly toolchain pinned in that workflow, then run `cargo +nightly-2026-11-05 fuzz run display`.
+
 ## Where to make a change
 
 | Task | Start here |

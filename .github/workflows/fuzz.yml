@@ -1,0 +1,62 @@
+name: fuzz
+# Fuzzes the code that handles untrusted input: terminal-safe text, ls --json
+# output, and saved-login parsing. Each target runs for three minutes. The
+# corpus is cached, so coverage builds up across runs. A crash fails the run,
+# and the input that caused it appears in the public log.
+on:
+  push:
+    paths:
+      - src/text.rs
+      - src/vault.rs
+      - fuzz/**
+      - .github/workflows/fuzz.yml
+  pull_request:
+    paths:
+      - src/text.rs
+      - src/vault.rs
+      - fuzz/**
+      - .github/workflows/fuzz.yml
+  schedule:
+    - cron: "43 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  NIGHTLY: nightly-2026-11-05
+  CARGO_FUZZ_VERSION: 0.13.2
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [display, listing_json, vault_open]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned nightly toolchain
+        run: rustup toolchain install "$NIGHTLY" --profile minimal
+      # Cache names put the target before a fixed word, because restores match by prefix.
+      - name: Cache cargo-fuzz and the fuzz build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-fuzz
+            fuzz/target
+          key: fuzz-${{ matrix.target }}-build-${{ env.NIGHTLY }}-${{ env.CARGO_FUZZ_VERSION }}-${{ hashFiles('fuzz/Cargo.lock') }}
+          restore-keys: fuzz-${{ matrix.target }}-build-${{ env.NIGHTLY }}-${{ env.CARGO_FUZZ_VERSION }}-
+      - name: Cache the corpus
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-${{ matrix.target }}-corpus-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: fuzz-${{ matrix.target }}-corpus-
+      - name: Install cargo-fuzz
+        run: |
+          if ! cargo-fuzz --version 2>/dev/null | grep -q "$CARGO_FUZZ_VERSION"; then
+            cargo +"$NIGHTLY" install cargo-fuzz --locked --version "$CARGO_FUZZ_VERSION" --force
+          fi
+      - name: Fuzz ${{ matrix.target }} for three minutes
+        run: cargo +"$NIGHTLY" fuzz run ${{ matrix.target }} -- -max_total_time=180 -rss_limit_mb=4096

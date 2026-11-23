@@ -1,4 +1,4 @@
-use crate::{bridge::ffi::Entry, state};
+use crate::{bridge::ffi::Entry, state, text::ListingJson};
 use std::io::{self, Write};
 
 pub fn size(bytes: i64) -> String {
@@ -36,30 +36,6 @@ pub fn listing(output: &mut impl Write, entries: &[Entry], terminal: bool) -> io
     }
     Ok(())
 }
-// serde_json escapes ASCII controls. Also escape terminal and bidi controls
-// from Unicode without changing the filename a JSON reader receives.
-struct ListingJson;
-impl serde_json::ser::Formatter for ListingJson {
-    fn write_string_fragment<W: ?Sized + Write>(
-        &mut self,
-        out: &mut W,
-        text: &str,
-    ) -> io::Result<()> {
-        let mut start = 0;
-        for (i, c) in text
-            .char_indices()
-            .filter(|(_, c)| state::unsafe_character(*c))
-        {
-            out.write_all(&text.as_bytes()[start..i])?;
-            for unit in c.encode_utf16(&mut [0; 2]) {
-                write!(out, "\\u{unit:04x}")?;
-            }
-            start = i + c.len_utf8();
-        }
-        out.write_all(&text.as_bytes()[start..])
-    }
-}
-
 /// Keep one SDK page in memory, including when a pipeline requests JSON.
 pub fn directory(
     out: &mut impl Write,

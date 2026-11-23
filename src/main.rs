@@ -10,6 +10,7 @@ mod operation;
 mod preview;
 mod startup;
 mod state;
+mod text;
 mod transfer;
 mod tui;
 mod vault;

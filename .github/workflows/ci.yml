@@ -69,7 +69,7 @@ jobs:
         env:
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
-      - run: cargo fmt --check
+      - run: cargo fmt --check && cargo fmt --manifest-path fuzz/Cargo.toml --check
       - run: ./scripts/cargo.sh test --locked
       - run: ./scripts/cargo.sh clippy --all-targets --locked -- -D warnings
       - run: ./scripts/cargo.sh auditable build --release --locked

@@ -1,3 +1,4 @@
+pub use crate::text::{display, unsafe_character};
 use anyhow::{Context, Result, ensure};
 use std::{
     fs::{self, File, OpenOptions},
@@ -195,21 +196,6 @@ pub fn component(name: &str) -> Result<()> {
         "Reserved filename"
     );
     Ok(())
-}
-pub fn display(s: &str) -> String {
-    let mut output = String::with_capacity(s.len());
-    for c in s.chars() {
-        if unsafe_character(c) {
-            output.extend(c.escape_default());
-        } else {
-            output.push(c);
-        }
-    }
-    output
-}
-pub fn unsafe_character(c: char) -> bool {
-    c.is_control()
-        || matches!(c, '\u{061c}' | '\u{200b}'..='\u{200f}' | '\u{2028}'..='\u{202e}' | '\u{2060}'..='\u{206f}' | '\u{feff}')
 }
 pub fn native(path: &Path) -> Result<&str> {
     path.to_str()
