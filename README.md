@@ -53,12 +53,14 @@ If the uninstaller is gone, the install script can do the same: `curl -fsSL http
 
 ### Verify a download
 
-From the release after 0.2.2 on, every release file and the container image carry a signed build attestation. It records the repository, commit, and workflow that built them, and it's logged publicly. With the [GitHub CLI](https://cli.github.com), check a file or the image like this:
+From 0.3.0 on, every release file and the container image carry a signed build attestation. It records the repository, commit, and workflow that built them, and it's logged publicly. With the [GitHub CLI](https://cli.github.com), check a file or the image like this:
 
 ```sh
 gh attestation verify megawren-X.Y.Z-x86_64-unknown-linux-musl.tar.gz --repo def324/megawren
 gh attestation verify oci://ghcr.io/def324/megawren:X.Y.Z --repo def324/megawren
 ```
+
+Each release also includes `megawren-X.Y.Z.intoto.jsonl`, which holds the attestations of all its files. Download it next to a file and add `--bundle megawren-X.Y.Z.intoto.jsonl` to check the file without fetching its attestation from GitHub.
 
 Each archive also comes with an SBOM (`.cdx.json`) that lists every library inside it, including the bundled C libraries. The program itself carries its list of Rust dependencies, so `cargo audit bin` can check an installed copy, for example `cargo audit bin ~/.local/bin/megawren`. To report a security problem, see the [security policy](SECURITY.md).
 

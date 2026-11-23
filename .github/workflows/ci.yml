@@ -83,7 +83,7 @@ jobs:
           bin/megawren status
       - name: Lint shell scripts
         if: runner.os == 'Linux'
-        run: shellcheck -s sh install.sh scripts/test-install.sh scripts/build-linux-packages.sh scripts/scan-sboms.sh
+        run: shellcheck -s sh install.sh scripts/test-install.sh scripts/build-linux-packages.sh scripts/scan-sboms.sh scripts/release-provenance.sh
       # install.sh installs the static archives on Linux, so it is tested there.
       - name: Test install.sh
         if: runner.os == 'macOS'
