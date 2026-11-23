@@ -100,6 +100,95 @@ jobs:
         with:
           name: megawren-${{ matrix.runner }}
           path: target/dist/
+  # Line coverage of the Rust code from the full test suite, including the
+  # terminal tests that run in child processes. The summary appears on the run
+  # page, and the HTML report is attached as an artifact.
+  coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@263313d2989f864a2b8613f97277288638e7d8f8 # 1.99.1
+        with:
+          components: llvm-tools-preview
+      - run: |
+          active=$(rustup show active-toolchain | cut -d' ' -f1)
+          rustup toolchain list --quiet | grep -v -x "$active" | xargs -r -n1 rustup toolchain uninstall
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: ubuntu-24.04-sdk
+          max-size: 1G
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: coverage
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-llvm-cov@0.9.1
+      - run: ./scripts/build-sdk.sh
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      - name: Measure coverage
+        run: |
+          ignore='(/tests\.rs|/tests/|src/tui/preview(\.rs|/))'
+          ./scripts/cargo.sh llvm-cov --locked --ignore-filename-regex "$ignore" --no-report
+          ./scripts/cargo.sh llvm-cov report --ignore-filename-regex "$ignore" --summary-only | tee target/coverage.txt
+          ./scripts/cargo.sh llvm-cov report --ignore-filename-regex "$ignore" --html --output-dir target/coverage
+          {
+            echo "### Test coverage"
+            echo
+            echo "Lines covered: $(awk '/^TOTAL/ {print $(NF-3)}' target/coverage.txt)"
+            echo
+            echo '```'
+            cat target/coverage.txt
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: target/coverage/
+  # AddressSanitizer over the tests: the Rust code and the C++ bridge in native/
+  # are instrumented, so a buffer overflow, use-after-free or double free in the
+  # bridge, or in SDK memory it touches, fails the run. The C++ is compiled with
+  # clang to match the sanitizer runtime that Rust links.
+  asan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NIGHTLY: nightly-2026-11-05
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - run: rustup toolchain install "$NIGHTLY" --profile minimal
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev
+      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        with:
+          key: ubuntu-24.04-sdk
+          max-size: 1G
+      - run: ./scripts/build-sdk.sh
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      - name: Test under AddressSanitizer
+        env:
+          RUSTFLAGS: -Zsanitizer=address
+          CC: clang
+          CXX: clang++
+          CFLAGS: -fsanitize=address -fno-omit-frame-pointer
+          CXXFLAGS: -fsanitize=address -fno-omit-frame-pointer
+          # The SDK is not instrumented, so container-overflow reports would be false alarms.
+          ASAN_OPTIONS: detect_leaks=0:detect_container_overflow=0
+        run: timeout 1800 ./scripts/cargo.sh +"$NIGHTLY" test --locked --target x86_64-unknown-linux-gnu
   # One statically linked binary per CPU runs on any Linux, including NAS systems.
   static-linux:
     strategy:
