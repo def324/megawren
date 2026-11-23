@@ -192,12 +192,18 @@ jobs:
       # A passing run only counts if the bridge really carries the sanitizer checks.
       - name: Confirm the C++ bridge is instrumented
         run: |
-          bridge=$(find target/x86_64-unknown-linux-gnu/debug/build -path '*/megawren-*/out/libmegawren-bridge.a' | head -n 1)
-          if ! nm "$bridge" | grep -q '__asan_report'; then
-            echo "::error::The C++ bridge was built without AddressSanitizer."
+          bridges=$(find target -name libmegawren-bridge.a)
+          if [ -z "$bridges" ]; then
+            echo "::error::No compiled C++ bridge found under target/."
             exit 1
           fi
-          echo "The C++ bridge ($bridge) calls AddressSanitizer checks."
+          for bridge in $bridges; do
+            if ! nm "$bridge" | grep -q '__asan_report'; then
+              echo "::error::$bridge was built without AddressSanitizer."
+              exit 1
+            fi
+            echo "$bridge calls AddressSanitizer checks."
+          done
   # One statically linked binary per CPU runs on any Linux, including NAS systems.
   static-linux:
     strategy:
