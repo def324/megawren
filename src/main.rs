@@ -6,6 +6,7 @@ mod display;
 mod error;
 mod feedback;
 mod input;
+mod manage;
 mod operation;
 mod preview;
 mod startup;
@@ -77,6 +78,40 @@ enum Command {
         /// One path uploads to /. With two or more paths, the last is an existing remote directory.
         #[arg(required = true, value_name = "PATH")]
         paths: Vec<PathBuf>,
+    },
+    /// Create remote folders
+    Mkdir {
+        /// Also create missing parent folders, and accept folders that already exist
+        #[arg(short, long)]
+        parents: bool,
+        #[arg(required = true, value_name = "REMOTE")]
+        paths: Vec<String>,
+    },
+    /// Move or rename remote files and folders
+    #[command(
+        override_usage = "megawren mv <REMOTE> <NEW_PATH>\n       megawren mv <REMOTE>... <REMOTE_DIR>"
+    )]
+    Mv {
+        /// With two or more paths, the last is an existing remote folder. Existing items are never replaced.
+        #[arg(required = true, num_args = 2.., value_name = "PATH")]
+        paths: Vec<String>,
+    },
+    /// Copy remote files and folders
+    #[command(
+        override_usage = "megawren cp <REMOTE> <NEW_PATH>\n       megawren cp <REMOTE>... <REMOTE_DIR>"
+    )]
+    Cp {
+        /// With two or more paths, the last is an existing remote folder. Existing items are never replaced.
+        #[arg(required = true, num_args = 2.., value_name = "PATH")]
+        paths: Vec<String>,
+    },
+    /// Move remote files and folders to the Rubbish Bin
+    Rm {
+        /// Also move folders and everything in them
+        #[arg(short, long)]
+        recursive: bool,
+        #[arg(required = true, value_name = "REMOTE")]
+        paths: Vec<String>,
     },
     /// Revoke and remove the saved login
     Logout,
@@ -403,6 +438,10 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                                     | Command::Get { .. }
                                     | Command::Put { .. }
                                     | Command::Preview { .. }
+                                    | Command::Mkdir { .. }
+                                    | Command::Mv { .. }
+                                    | Command::Cp { .. }
+                                    | Command::Rm { .. }
                             )
                         ) {
                             backend.load_current_drive()?;
@@ -475,6 +514,18 @@ fn run_account(mut args: Args, cancelled: Arc<AtomicBool>) -> Result<()> {
                     return Err(e);
                 }
             }
+            Some(Command::Mkdir { paths, parents }) => {
+                manage::mkdir(&mut backend, &paths, parents)?
+            }
+            Some(Command::Mv { mut paths }) => {
+                let to = paths.pop().unwrap();
+                manage::relocate(&mut backend, &paths, &to, false)?;
+            }
+            Some(Command::Cp { mut paths }) => {
+                let to = paths.pop().unwrap();
+                manage::relocate(&mut backend, &paths, &to, true)?;
+            }
+            Some(Command::Rm { paths, recursive }) => manage::rm(&mut backend, &paths, recursive)?,
             Some(Command::Get { .. } | Command::Put { .. }) => unreachable!(),
             None => tui::run(&mut backend)?,
             Some(Command::Status) => unreachable!(),

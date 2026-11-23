@@ -26,11 +26,19 @@ fn status_is_local_and_noninteractive() {
 }
 #[test]
 fn malformed_command_does_not_start_authentication() {
-    let output = Command::new(env!("CARGO_BIN_EXE_megawren"))
-        .arg("put")
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(2));
+    for args in [
+        &["put"][..],
+        &["mkdir"],
+        &["mv", "/a"],
+        &["cp", "/a"],
+        &["rm"],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_megawren"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{args:?}");
+    }
 }
 
 #[test]
@@ -44,6 +52,11 @@ fn release_help_explains_browser_and_collision_scope() {
     assert!(overview.contains("stdin, stdout, or stderr is redirected"));
     assert!(help(&["ls", "--help"]).contains("JSON array to stdout"));
     assert!(help(&["get", "--help"]).contains("existing local files"));
+    for command in ["mv", "cp"] {
+        assert!(help(&[command, "--help"]).contains("Existing items are never replaced"));
+    }
+    assert!(help(&["rm", "--help"]).contains("Rubbish Bin"));
+    assert!(help(&["mkdir", "--help"]).contains("--parents"));
 }
 
 #[test]
@@ -72,6 +85,19 @@ fn redirected_commands_explain_setup_and_validate_inputs_before_unlocking() {
     assert!(run(&["put", "first.txt", "missing.txt", "/Photos"]).contains("missing.txt"));
     assert!(run(&["get", "/a", "/b", "missing-dir"]).contains("missing-dir"));
     assert!(run(&["ls", "relative"]).contains("Remote paths must begin with /"));
+    assert!(run(&["mkdir", "relative"]).contains("Remote paths must begin with /"));
+    assert!(run(&["mv", "/a", "b"]).contains("Remote paths must begin with /"));
+    assert!(run(&["rm", "/a/../b"]).contains("Invalid filename"));
+    assert!(run(&["rm", "-r", "/"]).contains("cannot be moved to the Rubbish Bin"));
+    assert!(run(&["cp", "/", "/Backup"]).contains("below /"));
+    for args in [
+        &["mkdir", "-p", "/a/b"][..],
+        &["mv", "/a", "/b", "/Archive/"],
+        &["cp", "/a", "/"],
+        &["rm", "-r", "/a"],
+    ] {
+        assert!(run(args).contains("No saved login."), "{args:?}");
+    }
     assert!(run(&["get"]).contains("remote path or MEGA link"));
     assert!(run(&["login"]).contains("terminal"));
     std::fs::create_dir(dir.join("nested")).unwrap();

@@ -14,7 +14,7 @@ Megawren is a MEGA terminal client for MEGA on macOS 15 or later and Linux. It u
 - Upload and download files or folders, and keep working while they transfer. Follow or cancel each transfer.
 - Rename, move, or copy selected items. Restore files and folders from the Rubbish Bin.
 - Preview text files and images on request.
-- Use `ls`, `get`, and `put` in scripts. `ls --json` gives a machine-readable listing.
+- Use `ls`, `get`, `put`, `mkdir`, `mv`, `cp`, and `rm` in scripts. `ls --json` gives a machine-readable listing.
 
 [![Signing in with a six-digit authenticator code, uploading Coast walk.mp4 with progress in the sidebar, and downloading the video to the local Downloads folder.](docs/media/megawren.gif)](docs/media/megawren.gif?raw=true)
 
@@ -108,6 +108,18 @@ megawren put ./reports/*.csv /Reports
 With one path, `get` downloads here and `put` uploads to `/`. With two or more paths, the last one is the destination directory. It must already exist. Files and folders can travel together in one command.
 
 Downloads keep existing files unless you pass `--overwrite`. Uploads stop on a conflicting filename. If a batch fails, completed files stay in place and the command exits with an error. For a public MEGA link, run `megawren get`, paste the link at the hidden prompt, then choose a download directory. Press Enter to use the current directory.
+
+Organize files in MEGA the same way:
+
+```sh
+megawren mkdir -p /Reports/2026
+megawren mv /Reports/draft.csv /Reports/2026/final.csv
+megawren cp /Photos/a.jpg /Photos/b.jpg /Backup
+megawren rm /Reports/old.csv
+megawren rm -r /Reports/2024
+```
+
+`mv` and `cp` work like their Unix namesakes. If the last path is an existing folder, the items go into it. Otherwise the single item gets that path as its new name. They never replace an existing item. `mkdir -p` also creates missing parent folders. `rm` moves items to the Rubbish Bin, where you can restore them, and folders need `-r`. Like the full-screen view, these commands change only private items you own, outside shared or linked folders. `rm` also refuses a folder that contains shared or linked items.
 
 **From a script**, first run `megawren login` in a terminal and choose to save the login. If you set a passphrase, have your secret manager supply it on stdin using `--unlock-stdin`. This example receives it on file descriptor 3. With a passphrase-free login, just run `megawren ls --json /Reports`.
 

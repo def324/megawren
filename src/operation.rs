@@ -42,6 +42,10 @@ pub enum Stage {
     SavingIndex,
     UnlockingLogin,
     SavingLogin,
+    CreatingFolder,
+    Moving,
+    Copying,
+    Trashing,
 }
 impl Stage {
     fn label(self) -> &'static str {
@@ -58,6 +62,10 @@ impl Stage {
             Self::SavingIndex => "Saving local index",
             Self::UnlockingLogin => "Unlocking saved login",
             Self::SavingLogin => "Saving login",
+            Self::CreatingFolder => "Creating folder",
+            Self::Moving => "Moving",
+            Self::Copying => "Copying",
+            Self::Trashing => "Moving to Rubbish Bin",
         }
     }
     fn preparing_label(self) -> Option<&'static str> {

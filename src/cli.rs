@@ -28,6 +28,10 @@ pub fn remote_path(path: &str) -> Result<()> {
         .try_for_each(state::component)
 }
 
+fn is_root(path: &str) -> bool {
+    path.trim_matches('/').is_empty()
+}
+
 fn destination(paths: &mut Vec<PathBuf>, default: &str) -> PathBuf {
     if paths.len() > 1 {
         paths.pop().unwrap()
@@ -123,6 +127,26 @@ impl Transfer {
             }
             Some(Command::Ls { remote, .. }) => {
                 remote_path(remote)?;
+                Ok(None)
+            }
+            Some(Command::Mkdir { paths, .. }) => {
+                paths.iter().try_for_each(|p| remote_path(p))?;
+                Ok(None)
+            }
+            Some(Command::Mv { paths } | Command::Cp { paths }) => {
+                paths.iter().try_for_each(|p| remote_path(p))?;
+                ensure!(
+                    !paths[..paths.len() - 1].iter().any(|p| is_root(p)),
+                    "Choose files or folders below /"
+                );
+                Ok(None)
+            }
+            Some(Command::Rm { paths, .. }) => {
+                paths.iter().try_for_each(|p| remote_path(p))?;
+                ensure!(
+                    !paths.iter().any(|p| is_root(p)),
+                    "The cloud drive itself cannot be moved to the Rubbish Bin"
+                );
                 Ok(None)
             }
             _ => Ok(None),

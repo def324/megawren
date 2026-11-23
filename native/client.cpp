@@ -326,7 +326,7 @@ struct Client::Impl : MegaRequestListener, MegaTransferListener, MegaGlobalListe
     if(kind!=5 && protectedNode(*n,kind==6)) throw std::runtime_error("This action is limited to private items owned by this account");
     std::unique_ptr<MegaNode> target;
     if(kind==4) target.reset(api->getRubbishNode());
-    else if(kind==2 || kind==3 || kind==5 || kind==6) target=get(parent);
+    else if(kind==2 || kind==3 || kind==5 || kind==6 || kind==7) target=get(parent);
     if(kind!=1 && !target) throw std::runtime_error("Destination unavailable");
     if(target) {
         if(!target->isFolder()) throw std::runtime_error("Destination must be a folder");
@@ -340,12 +340,12 @@ struct Client::Impl : MegaRequestListener, MegaTransferListener, MegaGlobalListe
         }
     }
     std::string value(name);
-    if(kind==1 || kind==3 || kind==5) {
+    if(kind==1 || kind==3 || kind==5 || kind==7) {
         if(value.empty() || value.size()>255 || value=="." || value=="..") throw std::runtime_error("Invalid name");
         for(unsigned char c:value) if(c<32 || c==127 || std::strchr("/\\:<>\"|?*",c)) throw std::runtime_error("Unsafe name");
     }
         if(kind!=4) {
-            const char* finalName=(kind==1 || kind==3 || kind==5)?value.c_str():n->getName();
+            const char* finalName=(kind==1 || kind==3 || kind==5 || kind==7)?value.c_str():n->getName();
             auto destination=target?std::unique_ptr<MegaNode>(target->copy()):std::unique_ptr<MegaNode>(api->getParentNode(n.get()));
             if(!destination) throw std::runtime_error("Destination unavailable");
             std::unique_ptr<MegaNode> existing(api->getChildNode(destination.get(),finalName));
@@ -366,6 +366,7 @@ struct Client::Impl : MegaRequestListener, MegaTransferListener, MegaGlobalListe
                 break;
             }
             case 5: api->createFolder(plan.name.c_str(),plan.target.get(),this);break;
+            case 7: api->moveNode(plan.node.get(),plan.target.get(),plan.name.c_str(),this);break;
             default: throw std::runtime_error("Unknown file action");
         }
     }
@@ -434,7 +435,7 @@ void Client::start_stats(uint64_t id) {
 FolderStats Client::folder_stats() {std::lock_guard lock(impl->statsListener.mutex);return impl->statsListener.state;}
 rust::Vec<Entry> Client::folders(uint64_t id,size_t offset,size_t limit) {return impl->list(id,offset,limit,true);}
 void Client::change(uint8_t kind,uint64_t source,uint64_t parent,rust::Str name,uint64_t epoch) {
-    if(kind<1 || kind>6) throw std::runtime_error("Unknown file action");
+    if(kind<1 || kind>7) throw std::runtime_error("Unknown file action");
     if(epoch!=generation()) throw std::runtime_error("Cloud changed; review the action again");
     auto plan=impl->plan(kind,source,parent,name);
     if(epoch!=generation()) throw std::runtime_error("Cloud changed; review the action again");
