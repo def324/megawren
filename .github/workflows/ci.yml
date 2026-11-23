@@ -192,7 +192,7 @@ jobs:
       # A passing run only counts if the bridge really carries the sanitizer checks.
       - name: Confirm the C++ bridge is instrumented
         run: |
-          bridge=$(ls target/x86_64-unknown-linux-gnu/debug/build/megawren-*/out/libmegawren-bridge.a | head -n 1)
+          bridge=$(find target/x86_64-unknown-linux-gnu/debug/build -path '*/megawren-*/out/libmegawren-bridge.a' | head -n 1)
           if ! nm "$bridge" | grep -q '__asan_report'; then
             echo "::error::The C++ bridge was built without AddressSanitizer."
             exit 1
