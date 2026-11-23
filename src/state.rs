@@ -1,4 +1,4 @@
-pub use crate::text::{display, unsafe_character};
+pub use crate::text::display;
 use anyhow::{Context, Result, ensure};
 use std::{
     fs::{self, File, OpenOptions},
