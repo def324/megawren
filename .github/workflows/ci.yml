@@ -56,7 +56,7 @@ jobs:
       # Both caches reuse results only when sources, flags and toolchain match.
       # The ccache key ends with "-sdk" because restores match by prefix, and
       # "macos-15" would otherwise also match the "macos-15-intel" cache.
-      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ${{ matrix.runner }}-sdk
           max-size: 1G
@@ -120,7 +120,7 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev
-      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ubuntu-24.04-sdk
           max-size: 1G
@@ -171,7 +171,7 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libcrypto++-dev libsodium-dev libsqlite3-dev libcurl4-openssl-dev libicu-dev libssl-dev
-      - uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+      - uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ubuntu-24.04-sdk
           max-size: 1G
